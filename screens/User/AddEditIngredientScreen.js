@@ -11,7 +11,8 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db, storage } from '../../firebaseconfig';
 import { getAuth } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+
 import { v4 as uuidv4 } from 'uuid';
 import RNModal from 'react-native-modal';
 
@@ -169,28 +170,39 @@ const handleDelete = async () => {
   if (!editingItem) return;
 
   try {
-    // ✅ ลบจาก Firebase Storage ด้วย path ที่ชัวร์
+    // ลบรูปใน Storage ถ้ามี path เก็บไว้
     if (editingItem.imagePath) {
-      const imageRef = ref(storage, editingItem.imagePath);
-      await deleteObject(imageRef);
+      try {
+        const imageRef = ref(storage, editingItem.imagePath);
+        await deleteObject(imageRef);
+      } catch (e) {
+        // ถ้าลบรูปไม่ได้ (เช่น ไฟล์หาย/สิทธิ์ไม่พอ) ให้แค่แจ้งเตือนใน console แต่ไม่ให้ล้มขั้นตอนถัดไป
+        console.warn('ลบรูปจาก Storage ไม่สำเร็จ:', e?.code || e?.message);
+      }
     }
 
-    // ✅ ลบจาก Firestore
+    // ลบเอกสารใน Firestore
     await deleteDoc(doc(db, 'users', userId, 'userIngredient', editingItem.id));
 
-    // ✅ แจ้งเตือน
-    Platform.OS === 'web'
-      ? window.alert('ลบวัตถุดิบและรูปภาพเรียบร้อยแล้ว')
-      : Alert.alert('สำเร็จ', 'ลบวัตถุดิบและรูปภาพเรียบร้อยแล้ว');
+    // แจ้งผล
+    if (Platform.OS === 'web') {
+      window.alert('ลบวัตถุดิบและรูปภาพเรียบร้อยแล้ว');
+    } else {
+      Alert.alert('สำเร็จ', 'ลบวัตถุดิบและรูปภาพเรียบร้อยแล้ว');
+    }
 
-    setTimeout(() => navigation.goBack(), 500);
+    setTimeout(() => navigation.goBack(), 300);
   } catch (err) {
     console.error('ลบไม่สำเร็จ:', err);
-    Platform.OS === 'web'
-      ? window.alert('ไม่สามารถลบวัตถุดิบได้')
-      : Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถลบวัตถุดิบได้');
+    const msg = err?.code || err?.message || String(err);
+    if (Platform.OS === 'web') {
+      window.alert(`ไม่สามารถลบวัตถุดิบได้: ${msg}`);
+    } else {
+      Alert.alert('เกิดข้อผิดพลาด', `ไม่สามารถลบวัตถุดิบได้: ${msg}`);
+    }
   }
 };
+
 
 
 
