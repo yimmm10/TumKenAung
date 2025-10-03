@@ -22,6 +22,7 @@ import {
   addDoc,
   updateDoc,
   serverTimestamp,
+  doc,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../firebaseconfig';

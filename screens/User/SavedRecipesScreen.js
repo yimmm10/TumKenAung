@@ -2,25 +2,23 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Image, TouchableOpacity,
-  ActivityIndicator, Alert, ScrollView, Platform
+  ActivityIndicator, Alert, ScrollView, Platform, TextInput
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { db } from '../../firebaseconfig';
-import { collection, onSnapshot, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc, setDoc, query, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-
-// ---------- หมวดหมู่ ----------
-const CATEGORIES = ['ทั้งหมด', 'สูตรที่ชอบ', 'สูตรทำกินเอง', 'สูตรทางบ้าน', 'สูตรรักษ์สุขภาพ'];
 
 // ---------- ธีม ----------
 const THEME = {
-  bg: '#F3F5E6',
+  bg: '#fefae0',
   surface: '#FFFFFF',
-  green: '#4F6F16',
-  greenDark: '#3B520E',
-  yellow: '#F4B400',
+  green: '#6a994e',
+  greenDark: '#556b2f',
+  yellow: '#f4a261',
   chipBg: '#FFF7DB',
   text: '#2B2B2B',
   subText: '#6B7280',
@@ -36,7 +34,9 @@ export default function SavedRecipesScreen() {
 
   const [recipes, setRecipes] = useState([]);
   const [favorites, setFavorites] = useState({});
-  const [category, setCategory] = useState('ทั้งหมด');
+  const [fridgeMap, setFridgeMap] = useState({}); 
+  // ✅ กล่องค้นหา (ค้างอยู่บนจอเสมอ)
+  const [search, setSearch] = useState('');
 
   // ----------------- Auth: uid -----------------
   useEffect(() => {
@@ -48,11 +48,12 @@ export default function SavedRecipesScreen() {
   // ----------------- Recipes -----------------
   useEffect(() => {
     const colRef = collection(db, 'recipes');
+    const qRef = query(colRef, where('status', '==', 'approved'));
     const unsub = onSnapshot(
-      colRef,
+      qRef,
       (snap) => {
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setRecipes(data); //(data.filter(r => r.status === 'approved' || r.uid === uid)); //เจ้าของเห็นของตัวเองได้
+        setRecipes(data);
         setLoading(false);
       },
       (err) => {
@@ -67,6 +68,7 @@ export default function SavedRecipesScreen() {
   useEffect(() => {
     if (!uid) {
       setFavorites({});
+      setFridgeMap({});
       return;
     }
     const colRef = collection(db, 'users', uid, 'favorites');
@@ -81,15 +83,73 @@ export default function SavedRecipesScreen() {
     );
     return () => unsub();
   }, [uid]);
-
-  // ----------------- Filter -----------------
+  
+   // ----------------- Fridge items ของ user (ไว้เช็ค “ทำได้”) -----------------
+ useEffect(() => {
+   if (!uid) return;
+   const colRef = collection(db, 'users', uid, 'userIngredient');
+   const unsub = onSnapshot(
+     colRef,
+     (snap) => {
+       const map = {};
+      snap.docs.forEach((d) => {
+        const x = d.data() || {};
+        const raw = String(x.name || '');
+        const k   = keyify(raw);
+        if (k) {
+          map[k] = true;          // คีย์นอร์มัลไลซ์
+          map[raw.toLowerCase().trim()] = true; // กันกรณีโค้ดเก่าเรียกแบบเดิม
+        }
+      });
+       setFridgeMap(map);
+     },
+     (err) => console.error('fridge error:', err)
+   );
+   return () => unsub();
+ }, [uid]);
+const keyify = (s = '') => {
+  return String(s)
+    .toLowerCase()
+    .trim()
+    // ตัดข้อความในวงเล็บออก เช่น "น้ำตาล (ทรายขาว)" -> "น้ำตาล"
+    .replace(/\(.*?\)|\[.*?\]|\{.*?\}/g, '')
+    // ตัดสัญลักษณ์/เครื่องหมายวรรคตอนทั่วไป
+    .replace(/[~!@#$%^&*_\-+=|\\:;"'<>,.?/·•–—]/g, ' ')
+    // รวมช่องว่างซ้ำให้เหลือช่องเดียว
+    .replace(/\s+/g, ' ')
+    // ลบช่องว่างทั้งหมดเพื่อคีย์เทียบ (กันกรณี "ใบ โหระพา" vs "ใบโหระพา")
+    .replace(/\s/g, '');
+};
+const missingFromFridge = (recipe, map) => {
+  const list = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+  const names = list
+    .map(it => (typeof it === 'string' ? it : (it?.name ?? it?.ingredientName ?? it?.title ?? '')))
+    .map(n => keyify(n))
+    .filter(Boolean);
+  const uniq = Array.from(new Set(names));
+  const missing = uniq.filter(n => !map[n]);
+  return missing;
+};
+const canCookWithFridge = (recipe, map) => {
+  const list = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
+  if (!list.length) return false;
+  return list.every((it) => {
+    const raw = (typeof it === 'string' ? it : (it?.name ?? it?.ingredientName ?? it?.title ?? ''));
+    const k = keyify(raw);
+    return !!map[k];
+  });
+};
+  // ----------------- Filter + Search -----------------
   const filtered = useMemo(() => {
-    if (category === 'ทั้งหมด') return recipes;
-    if (category === 'สูตรที่ชอบ') {
-      return recipes.filter(r => !!favorites[r.id]);
-    }
-    return recipes.filter(r => (r.category || 'สูตรทำกินเอง') === category);
-  }, [recipes, category, favorites]);
+  const q = search.trim().toLowerCase();
+   if (!q) return recipes;
+
+   return recipes.filter((r) => {
+     const title = String(r.title || '').toLowerCase();
+     const author = String(r.authorName || '').toLowerCase();
+     return title.includes(q) || author.includes(q);
+   });
+ }, [recipes, search]);
 
   // ----------------- Helpers -----------------
   const isOwner = useCallback((recipe) => uid && recipe.uid === uid, [uid]);
@@ -103,7 +163,7 @@ export default function SavedRecipesScreen() {
       const wasFav = !!favorites[recipeId];
 
       // optimistic
-      setFavorites(prev => ({ ...prev, [recipeId]: !wasFav }));
+      setFavorites((prev) => ({ ...prev, [recipeId]: !wasFav }));
 
       try {
         const favRef = doc(db, 'users', uid, 'favorites', recipeId);
@@ -114,7 +174,7 @@ export default function SavedRecipesScreen() {
         }
       } catch (e) {
         // rollback
-        setFavorites(prev => ({ ...prev, [recipeId]: wasFav }));
+        setFavorites((prev) => ({ ...prev, [recipeId]: wasFav }));
         console.error('toggleFavorite error:', e);
         Alert.alert('ผิดพลาด', 'บันทึกรายการโปรดไม่สำเร็จ');
       }
@@ -130,7 +190,7 @@ export default function SavedRecipesScreen() {
         Alert.alert('ลบไม่ได้', 'คุณลบได้เฉพาะเมนูที่คุณสร้างเอง');
         return;
       }
-      Alert.alert('ยืนยันการลบ', `ลบ “${recipe.title || 'เมนู'}” ?`, [
+      Alert.alert('ยืนยันการลบ', `ลบ "${recipe.title || 'เมนู'}" ?`, [
         { text: 'ยกเลิก', style: 'cancel' },
         {
           text: 'ลบ',
@@ -138,6 +198,7 @@ export default function SavedRecipesScreen() {
           onPress: async () => {
             try {
               await deleteDoc(doc(db, 'recipes', recipe.id));
+              Alert.alert('สำเร็จ', 'ลบเมนูเรียบร้อยแล้ว');
             } catch (e) {
               console.error('delete recipe error:', e);
               Alert.alert('ผิดพลาด', 'ลบเมนูไม่สำเร็จ');
@@ -177,12 +238,30 @@ export default function SavedRecipesScreen() {
   // ----------------- Render item -----------------
   const renderItem = ({ item }) => {
     const fav = !!favorites[item.id];
+    const isMyRecipe = isOwner(item);
+    const missing = missingFromFridge(item, fridgeMap);
+    const canCook = (Array.isArray(item.ingredients) && item.ingredients.length > 0 && missing.length === 0);
+    const status = String(item.status || 'approved').toLowerCase();
+   const statusColor =
+     status === 'approved' ? '#16a34a' :
+     status === 'pending'  ? '#f59e0b' :
+     status === 'rejected' ? '#dc2626' : '#6b7280';
+
+    // ✅ Description ใต้ชื่อเมนู (fallback หลายคีย์)
+    const desc =
+      item.description ||
+      item.desc ||
+      item.details ||
+      item.shortDescription ||
+      '';
+
+    // ✅ ผู้เขียน: แสดงเฉพาะเมื่อมีจริง (ไม่ขึ้น "by Unknown")
+    const author = String(item.authorName || '').trim();
 
     return (
       <TouchableOpacity
         activeOpacity={0.9}
         style={styles.card}
-        // ให้เหมือนหน้า Home: ส่งทั้ง recipe และแนบ recipeId
         onPress={() => navigation.navigate('UserRecipeDetail', { recipe: item, recipeId: item.id })}
       >
         {/* รูป + ปุ่มดาว overlay */}
@@ -218,25 +297,53 @@ export default function SavedRecipesScreen() {
                 style={{ marginLeft: 6 }}
               />
             )}
+            {isMyRecipe && (
+              <View style={styles.ownerBadge}>
+                <Text style={styles.ownerBadgeText}>ของฉัน</Text>
+              </View>
+            )}
+            
           </View>
 
-          {!!item.summary && (
+          {/* ✅ คำบรรยายใต้ชื่อเมนู */}
+          {!!desc && (
             <Text style={styles.cardSummary} numberOfLines={3}>
-              {truncate(item.summary, 120)}
+              {truncate(String(desc), 120)}
             </Text>
           )}
+          {Array.isArray(item.ingredients) && item.ingredients.length > 0 && (
+            canCook ? (
+              <Text style={[styles.cardSummary, { color: THEME.green }]}>
+                มีวัตถุดิบครบ {item.ingredients.length} รายการ พร้อมทำได้เลย
+              </Text>
+            ) : (
+              <Text style={[styles.cardSummary, { color: '#dc2626' }]}>
+                ขาดวัตถุดิบ {missing.length} รายการ
+                {missing.length > 0 ? `: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}` : ''}
+              </Text>
+            )
+          )}
+          {/* แถวข้อมูลผู้เขียน/เวลา */}
+          <View style={styles.metaRow}>
+            {/* เว้นตำแหน่งซ้ายไว้ — แสดงเฉพาะเมื่อมีผู้เขียน */}
+            {author ? <Text style={styles.authorText}>by {author}</Text> : <View />}
 
-          <Text style={styles.authorText}>by {item.authorName || 'Unknown'}</Text>
+            {item.duration ? (
+              <Text style={styles.durationText}>{item.duration} นาที</Text>
+            ) : (
+              <View />
+            )}
+          </View>
 
-          {isOwner(item) && (
+          {isMyRecipe && (
             <View style={styles.ownerActions}>
               <TouchableOpacity onPress={() => onEdit(item)} style={styles.ownerBtn}>
-                <MaterialIcons name="edit" size={18} color={THEME.green} />
+                <MaterialIcons name="edit" size={16} color={THEME.green} />
                 <Text style={styles.ownerTxt}>แก้ไข</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => onDelete(item)} style={styles.ownerBtn}>
-                <MaterialIcons name="delete" size={18} color="#C73A3A" />
-                <Text style={[styles.ownerTxt, { color: '#C73A3A' }]}>ลบ</Text>
+                <MaterialIcons name="delete" size={16} color="#d32f2f" />
+                <Text style={[styles.ownerTxt, { color: '#d32f2f' }]}>ลบ</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -247,144 +354,326 @@ export default function SavedRecipesScreen() {
 
   // ----------------- UI -----------------
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Ionicons name="restaurant" size={18} color="#fff" />
-          <Text style={styles.headerTitle}>สูตรอาหาร</Text>
+    <SafeAreaView style={styles.safeContainer}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Ionicons name="restaurant" size={20} color="#fff" />
+            <Text style={styles.headerTitle}>สูตรอาหาร</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={onAdd} style={styles.headerIconBtn}>
+              <Ionicons name="add-circle-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={onAdd} style={styles.headerIconBtn}>
-            <Ionicons name="add-circle-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Chips */}
-      <View style={styles.chipBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipContent}
-        >
-          {CATEGORIES.map((c) => {
-            const label = c === 'สูตรที่ชอบ' ? `${c} (${favCount})` : c;
-            const active = category === c;
-            return (
-              <TouchableOpacity
-                key={c}
-                onPress={() => setCategory(c)}
-                style={[styles.chip, active && styles.chipActive]}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {label}
+        {/* ✅ กล่องค้นหา (ค้างบนจอเสมอ) */}
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={18} color={THEME.subText} style={{ marginHorizontal: 8 }} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="ค้นหาชื่อเมนู หรือชื่อผู้เขียน"
+            placeholderTextColor={THEME.subText}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {!!search && (
+            <TouchableOpacity onPress={() => setSearch('')} style={{ paddingHorizontal: 8 }}>
+              <Ionicons name="close-circle" size={18} color={THEME.subText} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* List */}
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={THEME.green} />
+            <Text style={{ marginTop: 12, color: THEME.greenDark, fontSize: 16 }}>กำลังโหลดเมนู…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="restaurant-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyTitle}>ไม่พบเมนูในหมวดนี้</Text>
+                <Text style={styles.emptySubtitle}>
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+              </View>
+            }
+          />
+        )}
       </View>
-
-      {/* List */}
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={THEME.green} />
-          <Text style={{ marginTop: 8, color: THEME.greenDark }}>กำลังโหลดเมนู…</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 24 }}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 60 }}>
-              <Text style={{ color: THEME.subText }}>ยังไม่มีเมนูในหมวดนี้</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 /* ======================= Styles ======================= */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.bg },
+  safeContainer: { 
+    flex: 1, 
+    backgroundColor: THEME.bg 
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: THEME.bg 
+  },
 
   // Header
   header: {
-    height: 56,
+    height: 60,
     backgroundColor: THEME.green,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     ...Platform.select({
       ios: { shadowColor: THEME.shadow, shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
-      android: { elevation: 3 },
+      android: { elevation: 4 },
       default: {},
     }),
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginLeft: 8 },
-  headerRight: { flexDirection: 'row', alignItems: 'center' },
-  headerIconBtn: { padding: 6 },
+  headerLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  headerTitle: { 
+    color: '#fff', 
+    fontSize: 20, 
+    fontWeight: '800', 
+    marginLeft: 10 
+  },
+  headerRight: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  headerIconBtn: { 
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)'
+  },
 
   // Chips
-  chipBar: { paddingTop: 8, paddingBottom: 6 },
-  chipContent: { paddingHorizontal: 12, alignItems: 'center' },
+  chipBar: { 
+    paddingTop: 12, 
+    paddingBottom: 8,
+    backgroundColor: THEME.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.border,
+  },
+  chipContent: { 
+    paddingHorizontal: 16, 
+    alignItems: 'center' 
+  },
   chip: {
     backgroundColor: THEME.chipBg,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: THEME.border,
-    marginRight: 8,
+    marginRight: 10,
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  chipActive: { backgroundColor: THEME.yellow, borderColor: THEME.yellow },
-  chipText: { color: THEME.text, fontSize: 14, fontWeight: '600' },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
+  chipActive: { 
+    backgroundColor: THEME.yellow, 
+    borderColor: THEME.yellow,
+    shadowOpacity: 0.15,
+  },
+  chipText: { 
+    color: THEME.text, 
+    fontSize: 14, 
+    fontWeight: '600' 
+  },
+  chipTextActive: { 
+    color: '#fff', 
+    fontWeight: '700' 
+  },
+
+  // ✅ Search (ค้างบนจอ)
+  searchWrap: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: THEME.border,
+    minHeight: 40,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchInput: {
+    flex: 1,
+    color: THEME.text,
+    paddingVertical: 6,
+    fontSize: 14,
+  },
 
   // Loading
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingWrap: { 
+    flex: 1, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+
+  // Empty state
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#999',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: THEME.green,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+  },
+  emptyButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
 
   // Card
   card: {
     flexDirection: 'row',
     backgroundColor: THEME.surface,
-    borderRadius: 14,
-    padding: 10,
-    marginTop: 12,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 16,
     borderWidth: 1,
     borderColor: THEME.border,
     ...Platform.select({
-      ios: { shadowColor: THEME.shadow, shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
-      android: { elevation: 1 },
+      ios: { shadowColor: THEME.shadow, shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+      android: { elevation: 3 },
       default: {},
     }),
   },
-  imageWrap: { width: 92, height: 92, borderRadius: 12, overflow: 'hidden', backgroundColor: '#EDEDED' },
-  cardImage: { width: '100%', height: '100%' },
+  imageWrap: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 14, 
+    overflow: 'hidden', 
+    backgroundColor: '#EDEDED',
+    position: 'relative'
+  },
+  cardImage: { 
+    width: '100%', 
+    height: '100%' 
+  },
   starFab: {
     position: 'absolute',
-    right: 6,
-    bottom: 6,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    right: 8,
+    bottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 999,
-    padding: 4,
+    padding: 6,
   },
 
-  cardBody: { flex: 1, marginLeft: 12 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginRight: 6 },
-  cardTitle: { fontSize: 16, fontWeight: '800', color: THEME.green, flexShrink: 1 },
-  cardSummary: { color: THEME.text, marginTop: 6, fontSize: 13, lineHeight: 18 },
-  authorText: { color: THEME.subText, fontSize: 12, marginTop: 8 },
+  cardBody: { 
+    flex: 1, 
+    marginLeft: 14,
+    justifyContent: 'space-between'
+  },
+  titleRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  cardTitle: { 
+    fontSize: 16, 
+    fontWeight: '800', 
+    color: THEME.green,
+    flex: 1,
+    minWidth: 0
+  },
+  ownerBadge: {
+    backgroundColor: THEME.yellow,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  ownerBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  cardSummary: { 
+    color: THEME.text, 
+    fontSize: 13, 
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  authorText: { 
+    color: THEME.subText, 
+    fontSize: 12 
+  },
+  durationText: {
+    color: THEME.green,
+    fontSize: 12,
+    fontWeight: '600',
+  },
 
-  ownerActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  ownerBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ownerTxt: { fontSize: 12, color: THEME.green },
+  ownerActions: { 
+    flexDirection: 'row', 
+    gap: 16 
+  },
+  ownerBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4 
+  },
+  ownerTxt: { 
+    fontSize: 12, 
+    fontWeight: '600'
+  },
+  statusBadge: {
+   paddingHorizontal: 8,
+   paddingVertical: 2,
+   borderRadius: 10,
+ },
+ statusBadgeText: {
+   color: 'white',
+   fontSize: 10,
+   fontWeight: 'bold',
+   letterSpacing: 0.3,
+ },
 });

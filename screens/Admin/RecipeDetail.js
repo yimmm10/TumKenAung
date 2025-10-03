@@ -9,7 +9,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebaseconfig';
 import Tag from '../../components/Tag';
 
@@ -194,6 +194,11 @@ const removeTag = idx => {
   // delete recipe
   const handleDelete = async () => {
     await deleteDoc(doc(db,'recipes',recipeId));
+    try { const imageRef = ref(storage, `Recipeimage/${recipeId}`);
+    await deleteObject(imageRef);
+    } catch(err) {
+      console.warn('ลบภาพจาก Storage ไม่สำเร็จ:', err);
+    } 
     navigation.goBack();
   };
 

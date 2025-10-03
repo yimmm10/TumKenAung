@@ -2,6 +2,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import VendorHomeScreen      from '../screens/Vendor/VendorHomeScreen';
 import OrdersScreen          from '../screens/Vendor/OrdersScreen';
@@ -12,6 +13,7 @@ import VendorProfileScreen   from '../screens/Vendor/VendorProfileScreen';
 const Tab = createBottomTabNavigator();
 
 export default function VendorTabNavigator() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       initialRouteName="VendorHome"
@@ -20,7 +22,7 @@ export default function VendorTabNavigator() {
         tabBarActiveTintColor: '#0066CC',
         tabBarInactiveTintColor: '#888',
         tabBarLabelStyle: { fontSize: 12 },
-        tabBarStyle: { height: 60, paddingBottom: 5 },
+        tabBarStyle: { height: 60 + insets.bottom, paddingBottom: insets.bottom },
         tabBarIcon: ({ color, size }) => {
           const icons = {
             VendorHome:      'home-outline',

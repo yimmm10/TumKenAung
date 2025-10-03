@@ -1,5 +1,5 @@
-// screens/User/AddEditRecipe.js
-import React, { useEffect, useState } from 'react';
+// screens/User/AddEditRecipeScreen.js
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Image, ScrollView, Alert, ActivityIndicator, Platform
@@ -9,10 +9,11 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 
 import { db, storage } from '../../firebaseconfig';
 import {
-  addDoc, collection, doc, getDoc, setDoc, deleteDoc, serverTimestamp
+  addDoc, collection, doc, getDoc, getDocs, setDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import Tag from '../../components/Tag';
 
 const THEME = {
   bg: '#f2f2d9',
@@ -25,11 +26,9 @@ const THEME = {
 };
 
 const CATEGORIES = ['สูตรทำกินเอง', 'สูตรทางบ้าน', 'สูตรรักษ์สุขภาพ'];
+const sanitize = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
-/** ตรวจสอบสิทธิ์ admin
- *  1) เช็ค custom claims: role/admin
- *  2) ไม่เจอ → เช็ค Firestore: users/{uid}.role === 'admin'
- */
+/** ตรวจสอบสิทธิ์ admin */
 async function checkIsAdmin(db, auth) {
   try {
     const token = await auth.currentUser?.getIdTokenResult?.();
@@ -57,12 +56,14 @@ export default function AddEditRecipe({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const [tags, setTags]   = useState([]);
+  const [tagInput, setTagInput] = useState('');
   // ฟอร์มหลัก
   const [title, setTitle] = useState('');
-  const [summary, setSummary] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [description, setDescription] = useState('');
+  
   const [imageUrl, setImageUrl] = useState('');
-  const [imagePath, setImagePath] = useState(''); // path ใน storage (ไว้ลบ/แก้)
+  const [imagePath, setImagePath] = useState(''); // path ใน storage
 
   // รายการย่อย
   const [ingredients, setIngredients] = useState([]); // [{name, part, qty, unit}]
@@ -70,6 +71,10 @@ export default function AddEditRecipe({ route, navigation }) {
   const [equipments, setEquipments] = useState([]);   // string[]
   const [steps, setSteps] = useState([]);             // string[]
 
+  // ตัวเลือกวัตถุดิบจาก Firestore -> ingredientOptions
+  const [ingOptions, setIngOptions] = useState([]);   // [{id, name, defaultUnit, defaultPart}]
+  const [ingOptLoading, setIngOptLoading] = useState(true);
+  const [openUnitIdx, setOpenUnitIdx] = useState(null);
   // โหลดสิทธิ์
   useEffect(() => {
     (async () => setIsAdmin(await checkIsAdmin(db, auth)))();
@@ -91,8 +96,7 @@ export default function AddEditRecipe({ route, navigation }) {
         }
         const d = snap.data();
         setTitle(d.title || '');
-        setSummary(d.summary || '');
-        setCategory(d.category || CATEGORIES[0]);
+        setDescription(d.description || '');
         setImageUrl(d.imageUrl || '');
         setImagePath(d.imagePath || '');
 
@@ -100,6 +104,7 @@ export default function AddEditRecipe({ route, navigation }) {
         setSeasonings(Array.isArray(d.seasonings) ? d.seasonings : []);
         setEquipments(Array.isArray(d.equipments) ? d.equipments : []);
         setSteps(Array.isArray(d.steps) ? d.steps : []);
+        setTags(Array.isArray(d?.tags) ? d.tags : []);
       } catch (e) {
         console.error('load recipe error:', e);
         Alert.alert('โหลดข้อมูลไม่สำเร็จ', 'โปรดลองใหม่');
@@ -107,15 +112,40 @@ export default function AddEditRecipe({ route, navigation }) {
         setLoading(false);
       }
     })();
-  }, [recipeId]);
+  }, [recipeId, navigation]);
 
-  // ===== helper จัดการแถว =====
-  const addRow = (setter, template) => setter((prev) => [...prev, template]);
-  const removeRow = (setter, idx) => setter((prev) => prev.filter((_, i) => i !== idx));
-  const updateRow = (setter, idx, key, val) =>
-    setter((prev) => prev.map((it, i) => (i === idx ? { ...it, [key]: val } : it)));
-  const updateRowStr = (setter, idx, val) =>
-    setter((prev) => prev.map((s, i) => (i === idx ? val : s)));
+  // โหลด ingredientOptions ทั้งชุดแล้วกรองในเครื่อง
+  useEffect(() => {
+  (async () => {
+    try {
+      setIngOptLoading(true);
+      const snap = await getDocs(collection(db, 'ingredientOptions'));
+      const rows = snap.docs.map(d => {
+        const x = d.data() || {};
+        const name = sanitize(
+          x.name ?? x.label ?? x.title ?? x.text ?? x.value ?? ''
+        );
+        // รองรับ units เป็น array
+        const unitsArr = Array.isArray(x.units) ? x.units.map(sanitize).filter(Boolean) : [];
+        const defaultUnit = sanitize(x.defaultUnit ?? x.unit ?? (unitsArr[0] ?? ''));
+        const defaultPart = sanitize(x.defaultPart ?? x.part ?? '');
+        return {
+          id: d.id,
+          name,
+          defaultUnit,
+          defaultPart,
+          units: unitsArr,
+        };
+      }).filter(o => o.name);  // ต้องมีชื่อถึงจะเอา
+      rows.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+      setIngOptions(rows);
+    } catch (e) {
+      console.warn('load ingredientOptions error:', e?.message);
+    } finally {
+      setIngOptLoading(false);
+    }
+  })();
+}, []);
 
   // ===== เลือกรูป + อัปโหลด =====
   const pickImage = async () => {
@@ -133,7 +163,6 @@ export default function AddEditRecipe({ route, navigation }) {
     if (!asset) return;
     try {
       setSaving(true);
-      // สร้าง path: recipes/<uid>/<timestamp>.jpg
       const path = `recipes/${uid || 'guest'}/${Date.now()}.jpg`;
       const response = await fetch(asset.uri);
       const blob = await response.blob();
@@ -141,7 +170,6 @@ export default function AddEditRecipe({ route, navigation }) {
       await uploadBytes(storageRef, blob);
       const url = await getDownloadURL(storageRef);
 
-      // ถ้ามีรูปเดิม ให้ลบทิ้ง
       if (imagePath) {
         try { await deleteObject(ref(storage, imagePath)); } catch {}
       }
@@ -172,10 +200,10 @@ export default function AddEditRecipe({ route, navigation }) {
 
       const basePayload = {
         title: title.trim(),
-        summary: summary.trim(),
-        category,
+        description: description.trim(),
         imageUrl: imageUrl || '',
         imagePath: imagePath || '',
+        tags: tags.filter(Boolean),
         ingredients,
         seasonings,
         equipments,
@@ -191,7 +219,6 @@ export default function AddEditRecipe({ route, navigation }) {
         : { ...basePayload, status: 'pending', submittedBy: uid, submittedAt: serverTimestamp(), approvedBy: null, approvedAt: null };
 
       if (recipeId) {
-        // แก้ไข: admin คง approved / user → กลับเป็น pending และเข้าคิว
         const finalPayload = isAdmin
           ? { ...payload, status: 'approved', approvedBy: uid, approvedAt: serverTimestamp() }
           : { ...payload, status: 'pending', approvedBy: null, approvedAt: null };
@@ -208,7 +235,6 @@ export default function AddEditRecipe({ route, navigation }) {
           });
         }
       } else {
-        // เพิ่มใหม่
         const newRef = await addDoc(collection(db, 'recipes'), payload);
 
         if (!isAdmin) {
@@ -257,6 +283,19 @@ export default function AddEditRecipe({ route, navigation }) {
     ]);
   };
 
+  const addTag = () => {
+  const v = (tagInput || '').trim();
+  if (!v) return;
+  // กันซ้ำ และจำกัดจำนวน (เช่น 8 แท็ก)
+  if (tags.includes(v)) return;
+  if (tags.length >= 8) return Alert.alert('ใส่แท็กได้สูงสุด 8 รายการ');
+  setTags(prev => [...prev, v]);
+  setTagInput('');
+};
+const removeTag = (idx) => {
+  setTags(prev => prev.filter((_, i) => i !== idx));
+};
+
   if (loading) {
     return (
       <View style={[styles.center, { flex: 1, backgroundColor: THEME.bg }]}>
@@ -281,7 +320,7 @@ export default function AddEditRecipe({ route, navigation }) {
         ) : <View style={{ width: 28 }} /> }
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="always">
         {/* การ์ดฟอร์ม */}
         <View style={styles.card}>
           {/* รูป */}
@@ -309,38 +348,60 @@ export default function AddEditRecipe({ route, navigation }) {
             style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
             placeholder="Placeholder"
             multiline
-            value={summary}
-            onChangeText={setSummary}
+            value={description}
+            onChangeText={setDescription}
           />
+          <Text style={styles.sectionTitle}>ประเภทอาหาร / แท็ก</Text>
+          <View style={{ flexDirection:'row', alignItems:'center', marginBottom: 8 }}>
+            <TextInput
+              style={[styles.input, { flex:1, marginRight:8 }]}
+              placeholder="พิมพ์แล้วกด + เช่น แกง, ต้ม, เผ็ดน้อย"
+              value={tagInput}
+              onChangeText={setTagInput}
+              onSubmitEditing={addTag}
+              returnKeyType="done"
+            />
+            <TouchableOpacity onPress={addTag} activeOpacity={0.85}>
+              <Ionicons name="add-circle-outline" size={28} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
 
-          {/* หมวดหมู่ */}
-          <Label text="หมวดหมู่" />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {CATEGORIES.map((c) => {
-              const active = c === category;
-              return (
-                <TouchableOpacity
-                  key={c}
-                  onPress={() => setCategory(c)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && { color: '#fff' }]}>{c}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* ตัวอย่างหมวดที่กดเลือกเร็ว ๆ */}
+          <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom: 8 }}>
+            {['แกง','ผัด','ทอด','ต้ม','ยำ','นึ่ง','สุขภาพ','มังสวิรัติ'].map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => { setTagInput(''); if (!tags.includes(s)) setTags(prev => [...prev, s]); }}
+                style={{ paddingHorizontal:12, paddingVertical:6, borderRadius:16, backgroundColor:'#FFF7DB', borderWidth:1, borderColor:'#E6E8EC' }}
+              >
+                <Text style={{ color:'#6B7280' }}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* แสดงแท็กที่เลือกแล้ว */}
+          <View style={{ flexDirection:'row', flexWrap:'wrap' }}>
+            {tags.map((t, i) => (
+              <Tag key={i} label={t} onRemove={() => removeTag(i)} />
+            ))}
           </View>
 
           {/* วัตถุดิบ */}
           <SectionHeader
             title="วัตถุดิบ"
-            onAdd={() => setIngredients((prev) => [...prev, { name: '', part: '', qty: '', unit: '' }])}
+            onAdd={() => setIngredients((prev) => [...prev, { _id: String(Date.now()),name: '', qty: '', unit: '' }])}
           />
           {ingredients.map((it, idx) => (
             <RowIngredient
-              key={idx}
+              key={it._id ?? idx}
+              rowIndex={idx}
+              openUnitIdx={openUnitIdx}
+              setOpenUnitIdx={setOpenUnitIdx}
               value={it}
               onChange={(key, val) => setIngredients((prev) => prev.map((x, i) => i === idx ? { ...x, [key]: val } : x))}
               onRemove={() => setIngredients((prev) => prev.filter((_, i) => i !== idx))}
+              options={ingOptions}
+              optionsLoading={ingOptLoading}
             />
           ))}
 
@@ -431,38 +492,156 @@ const RowSimple = ({ value, onChange, onRemove, placeholder }) => (
   </View>
 );
 
-const RowIngredient = ({ value, onChange, onRemove }) => (
-  <View style={styles.rowIng}>
-    <TextInput
-      style={[styles.input, styles.colName]}
-      placeholder="ชื่อ (เช่น ไข่ไก่)"
-      value={value.name}
-      onChangeText={(t) => onChange('name', t)}
-    />
-    <TextInput
-      style={[styles.input, styles.colPart]}
-      placeholder="ส่วน (เช่น ฟอง/หัว)"
-      value={value.part}
-      onChangeText={(t) => onChange('part', t)}
-    />
-    <TextInput
-      style={[styles.input, styles.colQty]}
-      placeholder="ปริมาณ"
-      keyboardType="numeric"
-      value={String(value.qty ?? '')}
-      onChangeText={(t) => onChange('qty', t)}
-    />
-    <TextInput
-      style={[styles.input, styles.colUnit]}
-      placeholder="หน่วย"
-      value={value.unit}
-      onChangeText={(t) => onChange('unit', t)}
-    />
-    <TouchableOpacity onPress={onRemove} style={styles.removeBtnSmall}>
-      <MaterialIcons name="delete" size={18} color="#fff" />
-    </TouchableOpacity>
-  </View>
-);
+/** แถววัตถุดิบ (มี Auto-suggest จาก ingredientOptions) */
+/** แถววัตถุดิบ (แก้เวอร์ชันนี้) */
+const RowIngredient = ({
+  value, onChange, onRemove,
+  options = [], optionsLoading = false,
+  rowIndex, openUnitIdx, setOpenUnitIdx
+}) => {
+  const [focused, setFocused] = useState(false);
+  const unitOpen = openUnitIdx === rowIndex;
+
+  const nameText = String(value?.name || '');
+  const query = nameText.trim().toLowerCase();
+
+  // หา option ที่ตรงกับชื่อเพื่อดึง units
+  const matchedOption = useMemo(() => {
+    const n = (value?.name || '').trim().toLowerCase();
+    if (!n) return null;
+    // ใช้ “เท่ากันเป๊ะ” ก่อน ถ้าไม่เจอค่อย fallback เป็น includes
+    return (
+      options.find(o => (o.name || '').toLowerCase() === n) ||
+      options.find(o => (o.name || '').toLowerCase().includes(n)) ||
+      null
+    );
+  }, [options, value?.name]);
+
+  const unitList = useMemo(() => {
+    if (!matchedOption) return [];
+    if (Array.isArray(matchedOption.units) && matchedOption.units.length) {
+      return matchedOption.units;
+    }
+    return matchedOption.defaultUnit ? [matchedOption.defaultUnit] : [];
+  }, [matchedOption]);
+
+  // รายการแนะนำชื่อ
+  const suggestions = useMemo(() => {
+    if (!focused || !query) return [];
+    const found = options.filter(o => (o.name || '').toLowerCase().includes(query));
+    return found.slice(0, 8);
+  }, [options, query, focused]);
+
+  const pickSuggestion = (opt) => {
+    onChange('name', opt.name);
+    // เติมหน่วยเริ่มต้นถ้ายังไม่มี
+    const firstUnit = (opt.units && opt.units.length) ? opt.units[0] : opt.defaultUnit;
+    if (!value?.unit && firstUnit) onChange('unit', firstUnit);
+    // ปิด suggestion และเปิด dropdown หน่วยทันที
+    setFocused(false);
+    setOpenUnitIdx(rowIndex);
+  };
+
+  return (
+    <View
+      style={[
+        styles.rowIng,
+        unitOpen ? { zIndex: 2000, elevation: 16 } : { zIndex: 1000 - rowIndex }
+      ]}
+    >
+      {/* ชื่อวัตถุดิบ + Suggestion */}
+      <View style={[styles.colNameWrap, { flex: 1.2 }]}>
+        <TextInput
+          style={[styles.input]}
+          placeholder="ชื่อ (เช่น ไข่ไก่)"
+          value={value.name}
+          onChangeText={(t) => { onChange('name', t); setOpenUnitIdx(null); }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 120)}
+        />
+        {focused && (
+          <View style={styles.suggestBox}>
+            {optionsLoading ? (
+              <View style={styles.suggestLoading}>
+                <ActivityIndicator size="small" color={THEME.greenDark} />
+                <Text style={{ marginLeft: 6, color: '#475569' }}>กำลังโหลดตัวเลือก…</Text>
+              </View>
+            ) : suggestions.length > 0 ? (
+              suggestions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={styles.suggestItem}
+                  activeOpacity={0.8}
+                  onPressIn={() => pickSuggestion(opt)}
+                >
+                  <Text style={styles.suggestText} numberOfLines={1}>
+                    {opt.name || opt.id}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.suggestEmpty}>
+                <Text style={{ color: '#64748B' }}>ไม่พบ “{nameText}”</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
+      <TextInput
+        style={[styles.input, styles.colQty]}
+        placeholder="ปริมาณ"
+        keyboardType="numeric"
+        value={String(value.qty ?? '')}
+        onChangeText={(t) => onChange('qty', t)}
+      />
+
+      {/* หน่วย */}
+      <View style={styles.unitWrap}>
+        <TouchableOpacity
+          style={styles.unitBox}
+          activeOpacity={0.8}
+          onPress={() => {
+            // ปิด suggestion เผื่อมันบังปุ่ม
+            setFocused(false);
+            setOpenUnitIdx(unitOpen ? null : rowIndex);
+          }}
+        >
+          <Text style={styles.unitText} numberOfLines={1}>
+            {value.unit ? String(value.unit) : 'เลือกหน่วย'}
+          </Text>
+          <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#111" />
+        </TouchableOpacity>
+
+        {unitOpen && (
+          <View style={styles.unitDropdown}>
+            {unitList.length ? (
+              unitList.map((u) => (
+                <TouchableOpacity
+                  key={u}
+                  style={styles.unitItem}
+                  activeOpacity={0.8}
+                  onPressIn={() => { onChange('unit', u); setOpenUnitIdx(null); }}
+                >
+                  <Text style={styles.unitItemText}>{u}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.unitEmpty}>
+                <Text style={styles.unitEmptyText}>ไม่มีหน่วยสำหรับวัตถุดิบนี้</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
+      <TouchableOpacity onPress={onRemove} style={styles.removeBtnSmall}>
+        <MaterialIcons name="delete" size={18} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 
 /* ----------------- styles ----------------- */
 const styles = StyleSheet.create({
@@ -524,13 +703,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 10, borderRadius: 16
   },
 
-  rowIng: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  colName: { flex: 1.1, marginRight: 6 },
-  colPart: { width: 90, marginRight: 6 },
+  rowIng: {
+  flexDirection:'row',
+  alignItems:'center',
+  marginBottom: 8,
+  position: 'relative',     
+  overflow: 'visible',
+},
+  // เดิม: colName เป็นสไตล์ให้ TextInput โดยตรง → ปรับเป็น wrapper เพื่อวาง Suggestion
+  colNameWrap: {
+    flex: 1.1,
+    marginRight: 6,
+    position: 'relative',
+    zIndex: 1500, // ให้อยู่เหนือ input อื่น
+  },
   colQty: { width: 80, marginRight: 6 },
   colUnit: { width: 80, marginRight: 6 },
   removeBtnSmall: { backgroundColor: THEME.danger, padding: 8, borderRadius: 16 },
 
+  // Suggestion dropdown
+  suggestBox: {
+  position: 'absolute', left: 0, right: 0, top: 44,
+  backgroundColor: '#fff',
+  borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
+  shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 8,       // ✅ Android
+  zIndex: 1600,      // ✅ iOS/Android ใหม่
+  maxHeight: 240,
+},
+  colNameWrap: { flex: 1.1, marginRight: 6, position: 'relative', zIndex: 9999 },
+  suggestLoading: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 12,
+  },
+  suggestItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+  },
+  suggestText: { flex: 1, color: '#111' },
+  suggestMeta: { color: '#64748B', marginLeft: 8, fontSize: 12 },
+  suggestEmpty: { paddingVertical: 10, paddingHorizontal: 12 },
+  
   actionRow: { flexDirection: 'row', marginTop: 18, justifyContent: 'center' },
   btn: {
     minWidth: 120, paddingVertical: 12, paddingHorizontal: 18,
@@ -539,4 +754,63 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: '700' },
 
   center: { alignItems: 'center', justifyContent: 'center' },
+  // ใน styles.suggestBox แทนที่ด้วย
+  suggestBox: {
+    position: 'absolute',
+    left: 0, right: 0, top: 44,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: '#E5E7EB',
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,     // ⬅️ สำคัญบน Android
+    zIndex: 9999,     // ⬅️ สำคัญบน iOS/Android ใหม่
+    maxHeight: 240,
+  },
+  // และใน styles.colNameWrap ให้มี zIndex สูงไว้ด้วย
+  colNameWrap: {
+    flex: 1.1, marginRight: 6, position: 'relative', zIndex: 9999,
+  },
+  // กล่องรอบ ๆ ช่องหน่วย
+unitWrap: {
+  width: 96,
+  marginRight: 6,
+  position: 'relative',
+  zIndex: 1700,         // ให้ลอยเหนือคอมโพเนนต์อื่น
+},
+unitBox: {
+  backgroundColor: '#f6efc7',
+  borderRadius: 22,
+  paddingHorizontal: 12,
+  paddingVertical: Platform.select({ ios: 10, android: 8 }),
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+unitText: { color: '#111', maxWidth: 70 },
+unitDropdown: {
+  position: 'absolute',
+  left: 0, right: 0,
+  top: 44,                // สูงพอให้ลงใต้ปุ่ม
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  borderWidth: 1, borderColor: '#E5E7EB',
+  overflow: 'hidden',
+  shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 8,          // Android
+  zIndex: 9999,
+  maxHeight: 220,
+},
+unitItem: {
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+},
+unitItemText: { color: '#111' },
+unitEmpty: { paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center' },
+unitEmptyText: { color: '#64748B' },
+
+
 });

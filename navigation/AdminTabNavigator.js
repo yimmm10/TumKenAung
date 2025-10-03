@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AdminDashboardScreen    from '../screens/Admin/Dashboard';
 import AdminRecipeStack        from './AdminRecipeStack';
 import VendorManagementScreen  from '../screens/Admin/VendorManage';
-//import IngredientStackNavigator  from '../IngredientStackNavigator';
+import IngredientStackNavigator  from './IngredientStackNavigator';
 
 const Tab = createBottomTabNavigator();
 
