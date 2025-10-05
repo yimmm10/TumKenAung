@@ -1,14 +1,14 @@
 // screens/User/FridgeScreen.js
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, Image, ScrollView, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { db, storage } from '../../firebaseconfig';
-import { doc, collection, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import { doc, collection, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
@@ -16,7 +16,7 @@ const categories = ['ทั้งหมด', 'ผัก', 'เนื้อสั
 
 export default function FridgeScreen() {
   const navigation = useNavigation();
-  const route = useRoute();
+  const auth = getAuth();
 
   const [userId, setUserId] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -25,334 +25,272 @@ export default function FridgeScreen() {
   const [groupId, setGroupId] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState('member');
   const [hostId, setHostId] = useState(null);
-
-  const [ingredients, setIngredients] = useState([]);
   const [groupMembers, setGroupMembers] = useState([]);
+  
+  const [ingredients, setIngredients] = useState([]);
 
-  // === unsubscribe refs ===
-  const unsubAuthRef = useRef(null);
-  const unsubUserDocRef = useRef(null);
-  const unsubOwnIngredientsRef = useRef(null);
-  const unsubMembersRef = useRef(null);
+  // Refs สำหรับ cleanup
+  const unsubscribers = useRef({
+    auth: null,
+    userDoc: null,
+    members: null,
+    ingredients: {} // { userId: unsubscribe }
+  });
 
-  // กลุ่ม: ฟังวัตถุดิบรายสมาชิก + วัตถุดิบกลางของกลุ่ม
-  const unsubMemberIngredientsRefs = useRef({});    // { [memberUid]: () => void }
-  const memberItemsRef = useRef({});                // { [memberUid]: Item[] }
-  const unsubGroupIngredientsRef = useRef(null);
-  const groupItemsRef = useRef([]);                 // Item[] จาก groups/{gid}/groupIngredient
-
-  // เก็บ members ล่าสุดสำหรับ listener ของ groupIngredient
-  const groupMembersRef = useRef([]);
-  useEffect(() => { groupMembersRef.current = groupMembers; }, [groupMembers]);
-
-  const stopAllGroupListeners = useCallback(() => {
-    // ยกเลิกฟังสมาชิก
-    if (unsubMembersRef.current) {
-      try { unsubMembersRef.current(); } catch {}
-      unsubMembersRef.current = null;
+  // ฟังก์ชันปิด listeners ทั้งหมด
+  const cleanupAllListeners = () => {
+    console.log('🧹 Cleaning up all listeners');
+    
+    // ปิด members listener
+    if (unsubscribers.current.members) {
+      unsubscribers.current.members();
+      unsubscribers.current.members = null;
     }
-    // ยกเลิกฟังวัตถุดิบรายสมาชิก
-    Object.values(unsubMemberIngredientsRefs.current || {}).forEach(unsub => {
-      try { unsub && unsub(); } catch {}
+
+    // ปิด ingredients listeners ทั้งหมด
+    Object.keys(unsubscribers.current.ingredients).forEach(memberId => {
+      if (unsubscribers.current.ingredients[memberId]) {
+        unsubscribers.current.ingredients[memberId]();
+      }
     });
-    unsubMemberIngredientsRefs.current = {};
-    memberItemsRef.current = {};
-    // ยกเลิกฟังวัตถุดิบกลางของกลุ่ม
-    if (unsubGroupIngredientsRef.current) {
-      try { unsubGroupIngredientsRef.current(); } catch {}
-      unsubGroupIngredientsRef.current = null;
-    }
-    groupItemsRef.current = [];
-  }, []);
+    unsubscribers.current.ingredients = {};
+    
+    console.log('✅ All listeners cleaned');
+  };
 
-  const startOwnIngredientsListener = useCallback((uid) => {
-    // โหมดเดี่ยว: ฟังเฉพาะตู้ของตัวเอง
-    if (unsubOwnIngredientsRef.current) {
-      try { unsubOwnIngredientsRef.current(); } catch {}
-      unsubOwnIngredientsRef.current = null;
-    }
-    const colRef = collection(db, 'users', uid, 'userIngredient');
-    unsubOwnIngredientsRef.current = onSnapshot(colRef, (snap) => {
-      const mine = snap.docs.map(d => ({ id: d.id, ownerId: uid, addedBy: uid, ...d.data() }));
-      setIngredients(mine);
-    }, (e) => console.error('own ingredients listener error:', e));
-  }, []);
+  // ฟังก์ชันเริ่ม listeners ของกลุ่ม
+  const startGroupListeners = (gid, uid) => {
+    console.log('👥 Starting GROUP mode for:', gid);
+    
+    // ล้าง listeners เก่าทั้งหมดก่อน
+    cleanupAllListeners();
+    
+    // ล้าง state ทันที
+    setIngredients([]); // ล้างวัตถุดิบเก่าออกทันที
 
-  // รวมวัตถุดิบทุกแหล่ง (Host ก่อน → วัตถุดิบกลางของกลุ่ม → สมาชิกคนอื่น)
-  const recomputeGroupCombined = useCallback((hostUid) => {
-    const allByMember = memberItemsRef.current || {};
-    const allMemberIds = Object.keys(allByMember);
-    const hostItems = hostUid ? (allByMember[hostUid] || []) : [];
-    const others = allMemberIds
-      .filter(uid => uid !== hostUid)
-      .sort()
-      .flatMap(uid => allByMember[uid] || []);
-    const groupItems = groupItemsRef.current || [];
-    setIngredients([...hostItems, ...groupItems, ...others]);
-  }, []);
+    const membersData = {};
+    const ingredientsData = {};
 
-  // ดึงข้อมูลรอบเดียวเพื่อไม่ให้จอว่างตอนเข้าโหมดกลุ่มครั้งแรก
-  const seedGroupStateOnce = useCallback(async (gid) => {
-    try {
-      // 1) สมาชิกกลุ่ม
-      const memSnap = await getDocs(collection(db, 'groups', gid, 'members'));
-      const members = memSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // ฟังรายชื่อสมาชิก
+    const membersRef = collection(db, 'groups', gid, 'members');
+    unsubscribers.current.members = onSnapshot(membersRef, (snapshot) => {
+      console.log('👤 Members updated:', snapshot.docs.length);
+      const members = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
       setGroupMembers(members);
-      groupMembersRef.current = members;
 
-      // 2) วัตถุดิบของสมาชิกแต่ละคน
-      const memberIngsSnaps = await Promise.all(
-        members.map(m => getDocs(collection(db, 'users', m.id, 'userIngredient')))
-      );
-      memberItemsRef.current = {};
-      memberIngsSnaps.forEach((s, idx) => {
-        const mid = members[idx].id;
-        memberItemsRef.current[mid] = s.docs.map(d => ({
-          id: d.id,
-          ownerId: mid,
-          addedBy: d.data().addedBy || mid,
-          ...d.data()
-        }));
-      });
+      // หา role และ host
+      const currentMember = members.find(m => m.id === uid);
+      setCurrentUserRole(currentMember?.role || 'member');
 
-      // 3) วัตถุดิบกลางของกลุ่ม (ถ้ามี)
-      const gIngSnap = await getDocs(collection(db, 'groups', gid, 'groupIngredient'));
-      groupItemsRef.current = gIngSnap.docs.map(d => ({
-        id: d.id,
-        ownerId: d.data().ownerId || d.data().addedBy || 'GROUP',
-        addedBy: d.data().addedBy || 'unknown',
-        targetGroupId: gid,
-        ...d.data(),
-      }));
+      const host = members.find(m => m.role === 'host');
+      setHostId(host?.id || null);
 
-      // 4) จัดลำดับ Host → กลุ่ม → สมาชิกอื่น
-      const hostUid = members.find(m => m.role === 'host')?.id || null;
-      recomputeGroupCombined(hostUid);
-    } catch (e) {
-      console.warn('seedGroupStateOnce error:', e?.message || e);
-    }
-  }, [recomputeGroupCombined]);
-
-  const startGroupFridgeListener = useCallback((gid, uid) => {
-    // เริ่มโหมดกลุ่มใหม่: เคลียร์ listener เดิมทั้งหมดก่อน
-    stopAllGroupListeners();
-
-    // ดึงข้อมูลรอบเดียวให้จอไม่ว่าง (ไม่ต้องรอ onSnapshot)
-    seedGroupStateOnce(gid);
-
-    // 1) ฟัง "รายชื่อสมาชิก" เหมือน InviteScreen
-    const memRef = collection(db, 'groups', gid, 'members');
-    unsubMembersRef.current = onSnapshot(memRef, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); // id = uid
-      setGroupMembers(list);
-      groupMembersRef.current = list;
-
-      const me = list.find(m => m.id === uid);
-      setCurrentUserRole(me?.role === 'host' ? 'host' : 'member');
-
-      const host = list.find(m => m.role === 'host');
-      const newHostId = host ? host.id : null;
-      setHostId(newHostId);
-
-      // ล้าง listener ของคนที่ออกจากกลุ่ม
-      const currentMemberUids = new Set(list.map(m => m.id));
-      Object.keys(unsubMemberIngredientsRefs.current).forEach(memberUid => {
-        if (!currentMemberUids.has(memberUid)) {
-          try { unsubMemberIngredientsRefs.current[memberUid]?.(); } catch {}
-          delete unsubMemberIngredientsRefs.current[memberUid];
-          delete memberItemsRef.current[memberUid];
+      // จัดการ ingredients listeners
+      const currentMemberIds = new Set(members.map(m => m.id));
+      
+      // ลบ listener ของคนที่ออกจากกลุ่ม
+      Object.keys(unsubscribers.current.ingredients).forEach(memberId => {
+        if (!currentMemberIds.has(memberId)) {
+          if (unsubscribers.current.ingredients[memberId]) {
+            unsubscribers.current.ingredients[memberId]();
+          }
+          delete unsubscribers.current.ingredients[memberId];
+          delete ingredientsData[memberId];
         }
       });
 
-      // เพิ่ม listener ให้สมาชิกที่ยังไม่ได้ฟัง
-      list.forEach(member => {
-        const memberUid = member.id;
-        if (!unsubMemberIngredientsRefs.current[memberUid]) {
-          const ingRef = collection(db, 'users', memberUid, 'userIngredient');
-          const unsub = onSnapshot(ingRef, (s) => {
-            const items = s.docs.map(d => ({
-              id: d.id,
-              ownerId: memberUid,
-              addedBy: d.data().addedBy || memberUid,
-              ...d.data()
+      // เพิ่ม listener สำหรับสมาชิกใหม่
+      members.forEach(member => {
+        const memberId = member.id;
+        
+        if (!unsubscribers.current.ingredients[memberId]) {
+          const ingredientsRef = collection(db, 'users', memberId, 'userIngredient');
+          
+          unsubscribers.current.ingredients[memberId] = onSnapshot(ingredientsRef, (ingSnapshot) => {
+            const items = ingSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ownerId: memberId,
+              addedBy: doc.data().addedBy || memberId,
+              ...doc.data()
             }));
-            memberItemsRef.current[memberUid] = items;
-            recomputeGroupCombined(newHostId);
-          }, (err) => console.error(`ingredients listener error (${memberUid}):`, err));
 
-          unsubMemberIngredientsRefs.current[memberUid] = unsub;
+            ingredientsData[memberId] = items;
+            updateCombinedIngredients(ingredientsData, host?.id);
+          }, (error) => {
+            console.error(`Ingredients listener error for ${memberId}:`, error);
+          });
         }
       });
 
-      // คำนวณครั้งแรก/ทุกครั้งที่รายชื่อเปลี่ยน
-      recomputeGroupCombined(newHostId);
-    }, (err) => console.error('members listener error:', err));
+      // อัพเดทครั้งแรก
+      updateCombinedIngredients(ingredientsData, host?.id);
+    }, (error) => {
+      console.error('Members listener error:', error);
+    });
 
-    // 2) ค่อยฟัง "วัตถุดิบกลางของกลุ่ม"
-    const gIngRef = collection(db, 'groups', gid, 'groupIngredient');
-    unsubGroupIngredientsRef.current = onSnapshot(gIngRef, (s) => {
-      const items = s.docs.map(d => ({
-        id: d.id,
-        ownerId: d.data().ownerId || d.data().addedBy || 'GROUP',
-        addedBy: d.data().addedBy || 'unknown',
-        targetGroupId: gid,
-        ...d.data(),
-      }));
-      groupItemsRef.current = items;
-      const currentHost = groupMembersRef.current?.find?.(m => m.role === 'host')?.id || null;
-      recomputeGroupCombined(currentHost);
-    }, (err) => console.error('group ingredients listener error:', err));
-  }, [recomputeGroupCombined, stopAllGroupListeners, seedGroupStateOnce]);
+    // ฟังก์ชันรวมวัตถุดิบทั้งหมด
+    function updateCombinedIngredients(data, hostId) {
+      const allItems = [];
+      
+      // 1. วัตถุดิบของ Host (ถ้ามี)
+      if (hostId && data[hostId]) {
+        allItems.push(...data[hostId]);
+      }
 
-  const switchToSolo = useCallback((uid) => {
-    setGroupId(null);
+      // 2. วัตถุดิบของสมาชิกคนอื่น
+      Object.keys(data).forEach(memberId => {
+        if (memberId !== hostId) {
+          allItems.push(...data[memberId]);
+        }
+      });
+
+      console.log('📦 Group ingredients updated:', allItems.length);
+      setIngredients(allItems);
+    }
+  };
+
+  // ฟังก์ชันเริ่ม listener โหมดเดี่ยว
+  const startSoloListener = (uid) => {
+    console.log('🔄 Starting SOLO mode for:', uid);
+    
+    // ล้าง listeners เก่าทั้งหมดก่อน
+    cleanupAllListeners();
+    
+    // ล้าง state ทันที
     setGroupMembers([]);
     setHostId(null);
     setCurrentUserRole('member');
-    stopAllGroupListeners();
-    startOwnIngredientsListener(uid);
-  }, [startOwnIngredientsListener, stopAllGroupListeners]);
+    setIngredients([]); // ล้างวัตถุดิบเก่าออกทันที
 
-  const switchToGroup = useCallback((gid, uid) => {
-    setGroupId(gid);
-    setGroupMembers([]);
-    setIngredients([]);
-    setHostId(null);
-    if (unsubOwnIngredientsRef.current) {
-      try { unsubOwnIngredientsRef.current(); } catch {}
-      unsubOwnIngredientsRef.current = null;
-    }
-    startGroupFridgeListener(gid, uid);
-  }, [startGroupFridgeListener]);
+    // เริ่ม listener ใหม่สำหรับตู้ของตัวเอง
+    const ingredientsRef = collection(db, 'users', uid, 'userIngredient');
+    unsubscribers.current.ingredients[uid] = onSnapshot(ingredientsRef, (snapshot) => {
+      console.log('📦 Solo ingredients updated:', snapshot.docs.length);
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ownerId: uid,
+        addedBy: uid,
+        ...doc.data()
+      }));
+      setIngredients(items);
+    }, (error) => {
+      console.error('Solo listener error:', error);
+    });
+  };
 
-  const forceSwitchToSolo = useCallback(() => {
-    if (!userId) return;
-    switchToSolo(userId);
-  }, [switchToSolo, userId]);
-
+  // Effect หลัก: ฟังการเปลี่ยนแปลงของ user
   useEffect(() => {
-    const auth = getAuth();
-    unsubAuthRef.current = onAuthStateChanged(auth, (user) => {
+    unsubscribers.current.auth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         Alert.alert('ไม่พบผู้ใช้งาน', 'กรุณาเข้าสู่ระบบใหม่');
         navigation.navigate('Login');
         return;
       }
-      setUserId(user.uid);
 
-      if (unsubUserDocRef.current) {
-        try { unsubUserDocRef.current(); } catch {}
-        unsubUserDocRef.current = null;
+      const uid = user.uid;
+      setUserId(uid);
+
+      // ปิด listener เก่า (ถ้ามี)
+      if (unsubscribers.current.userDoc) {
+        unsubscribers.current.userDoc();
       }
-      const uref = doc(db, 'users', user.uid);
-      unsubUserDocRef.current = onSnapshot(uref, (snap) => {
-        const gid = snap?.data()?.groupId || null;
-        if (gid) {
-          if (gid !== groupId) switchToGroup(gid, user.uid);
+
+      // ฟังการเปลี่ยนแปลงของ groupId
+      const userDocRef = doc(db, 'users', uid);
+      unsubscribers.current.userDoc = onSnapshot(userDocRef, (snapshot) => {
+        const userData = snapshot.data();
+        const userGroupId = userData?.groupId || null;
+
+        console.log('📋 User groupId changed:', userGroupId);
+
+        if (userGroupId) {
+          // อยู่ในกลุ่ม
+          if (userGroupId !== groupId) {
+            console.log('➡️ Switching to group mode');
+            setGroupId(userGroupId);
+            setIngredients([]); // ล้างก่อนเริ่มใหม่
+            
+            // ใช้ setTimeout เพื่อให้แน่ใจว่า state ถูกล้างก่อน
+            setTimeout(() => {
+              startGroupListeners(userGroupId, uid);
+            }, 50);
+          }
         } else {
-          if (groupId !== null) switchToSolo(user.uid);
-          if (!unsubOwnIngredientsRef.current) startOwnIngredientsListener(user.uid);
+          // ไม่ได้อยู่ในกลุ่ม
+          console.log('➡️ Switching to solo mode');
+          setGroupId(null);
+          setIngredients([]); // ล้างก่อนเริ่มใหม่
+          
+          // ใช้ setTimeout เพื่อให้แน่ใจว่า listeners เก่าถูกปิดและ state ถูกล้างก่อน
+          setTimeout(() => {
+            startSoloListener(uid);
+          }, 50);
         }
-      }, (e) => console.error('user doc listener error:', e));
+      }, (error) => {
+        console.error('User doc listener error:', error);
+      });
     });
 
+    // Cleanup เมื่อ unmount
     return () => {
-      try { unsubAuthRef.current && unsubAuthRef.current(); } catch {}
-      try { unsubUserDocRef.current && unsubUserDocRef.current(); } catch {}
-      try { unsubOwnIngredientsRef.current && unsubOwnIngredientsRef.current(); } catch {}
-      stopAllGroupListeners();
+      if (unsubscribers.current.auth) {
+        unsubscribers.current.auth();
+      }
+      if (unsubscribers.current.userDoc) {
+        unsubscribers.current.userDoc();
+      }
+      cleanupAllListeners();
     };
-  }, [navigation, groupId, startOwnIngredientsListener, switchToGroup, switchToSolo, stopAllGroupListeners]);
-
-  // รับพารามิเตอร์จากหน้า Invite เพื่อ "บังคับ" กลับโหมดเดี่ยวทันที
-  useEffect(() => {
-    if (route?.params?.mode === 'solo') {
-      forceSwitchToSolo();
-    }
-  }, [route?.params?.mode, forceSwitchToSolo]);
+  }, [groupId]);
 
   const handleDelete = async (id, ownerId) => {
     try {
-      if (groupId) {
-        // ตอนนี้ group = รวม (ตู้ของสมาชิก) + (ตู้กลางของกลุ่ม)
-        const item = ingredients.find(it => it.id === id && (it.ownerId === ownerId || it.targetGroupId === groupId))
-                  || ingredients.find(it => it.id === id);
-        if (!item) {
-          Alert.alert('ไม่พบรายการ', 'ไม่พบวัตถุดิบที่ต้องการลบ');
-          return;
-        }
+      const item = ingredients.find(it => it.id === id);
+      if (!item) {
+        Alert.alert('ไม่พบรายการ', 'ไม่พบวัตถุดิบที่ต้องการลบ');
+        return;
+      }
 
+      if (groupId) {
         const canDelete = (currentUserRole === 'host') || (item.addedBy === userId);
         if (!canDelete) {
-          Alert.alert('ไม่มีสิทธิ์', 'คุณสามารถลบได้เฉพาะรายการที่คุณเพิ่มเองหรือหากคุณเป็นเจ้าของกลุ่ม');
+          Alert.alert('ไม่มีสิทธิ์', 'คุณสามารถลบได้เฉพาะรายการที่คุณเพิ่มเอง หรือหากคุณเป็นเจ้าของกลุ่ม');
           return;
         }
-
-        const whereText = item.targetGroupId ? 'ตู้กลางของกลุ่ม' : (item.ownerId === userId ? 'ตู้ของคุณ' : 'ตู้ของสมาชิก');
-        Alert.alert(
-          'ยืนยันการลบ',
-          `คุณต้องการลบ "${item.name}" ออกจาก${whereText} ใช่หรือไม่?`,
-          [
-            { text: 'ยกเลิก', style: 'cancel' },
-            {
-              text: 'ลบ',
-              style: 'destructive',
-              onPress: async () => {
-                try {
-                  if (item?.imagePath) {
-                    try { await deleteObject(ref(storage, item.imagePath)); } catch (e) {
-                      console.warn('ลบรูปไม่ได้/ไม่มีอยู่:', e?.code || e?.message);
-                    }
-                  }
-                  if (item.targetGroupId) {
-                    // อยู่ใน groups/{gid}/groupIngredient
-                    await deleteDoc(doc(db, 'groups', groupId, 'groupIngredient', item.id));
-                  } else {
-                    // อยู่ใน users/{ownerId}/userIngredient
-                    await deleteDoc(doc(db, 'users', item.ownerId, 'userIngredient', item.id));
-                  }
-                  Alert.alert('สำเร็จ', 'ลบวัตถุดิบเรียบร้อยแล้ว');
-                } catch (err) {
-                  console.error('ลบไม่สำเร็จ:', err);
-                  Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถลบวัตถุดิบได้');
-                }
-              }
-            }
-          ]
-        );
-      } else {
-        // โหมดเดี่ยว
-        const itemToDelete = ingredients.find(it => it.id === id);
-        if (!itemToDelete) {
-          Alert.alert('ไม่พบรายการ', 'ไม่พบวัตถุดิบที่ต้องการลบ');
-          return;
-        }
-        Alert.alert(
-          'ยืนยันการลบ',
-          `คุณต้องการลบ "${itemToDelete.name}" ใช่หรือไม่?`,
-          [
-            { text: 'ยกเลิก', style: 'cancel' },
-            {
-              text: 'ลบ',
-              style: 'destructive',
-              onPress: async () => {
-                try {
-                  if (itemToDelete?.imagePath) {
-                    try { await deleteObject(ref(storage, itemToDelete.imagePath)); } catch (e) {
-                      console.warn('ลบรูปไม่ได้/ไม่มีอยู่:', e?.code || e?.message);
-                    }
-                  }
-                  await deleteDoc(doc(db, 'users', userId, 'userIngredient', id));
-                  Alert.alert('สำเร็จ', 'ลบวัตถุดิบเรียบร้อยแล้ว');
-                } catch (err) {
-                  console.error('ลบไม่สำเร็จ:', err);
-                  Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถลบวัตถุดิบได้');
-                }
-              }
-            }
-          ]
-        );
       }
+
+      Alert.alert(
+        'ยืนยันการลบ',
+        `คุณต้องการลบ "${item.name}" ใช่หรือไม่?`,
+        [
+          { text: 'ยกเลิก', style: 'cancel' },
+          {
+            text: 'ลบ',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                if (item?.imagePath) {
+                  try {
+                    await deleteObject(ref(storage, item.imagePath));
+                  } catch (e) {
+                    console.warn('ลบรูปไม่สำเร็จ:', e.message);
+                  }
+                }
+                
+                await deleteDoc(doc(db, 'users', item.ownerId, 'userIngredient', item.id));
+                Alert.alert('สำเร็จ', 'ลบวัตถุดิบเรียบร้อยแล้ว');
+              } catch (err) {
+                console.error('ลบไม่สำเร็จ:', err);
+                Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถลบวัตถุดิบได้');
+              }
+            }
+          }
+        ]
+      );
     } catch (e) {
       console.error('handleDelete error:', e);
       Alert.alert('เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบ');
@@ -367,17 +305,11 @@ export default function FridgeScreen() {
 
   const getItemInfo = (item) => {
     if (!groupId) return 'คุณ';
-    if (item.targetGroupId) {
-      const addedByMember = groupMembers.find(m => m.id === item.addedBy);
-      const addedByName = item.addedBy === userId
-        ? 'คุณ'
-        : (addedByMember?.name || addedByMember?.displayName || item.addedBy || 'ไม่ทราบชื่อ');
-      return `รายการกลุ่ม • เพิ่มโดย: ${addedByName}`;
-    }
+    
     const addedByMember = groupMembers.find(m => m.id === item.addedBy);
     const addedByName = item.addedBy === userId
       ? 'คุณ'
-      : (addedByMember?.name || addedByMember?.displayName || item.addedBy || 'ไม่ทราบชื่อ');
+      : (addedByMember?.name || addedByMember?.displayName || 'สมาชิก');
     return `เพิ่มโดย: ${addedByName}`;
   };
 
@@ -395,17 +327,11 @@ export default function FridgeScreen() {
     <TouchableOpacity
       onPress={() => {
         if (canEditItem(item)) {
-          // กลุ่ม:
-          // - ถ้าเป็นรายการ "กลุ่ม" ให้ส่ง targetGroupId เพื่อแก้ใน groups/{gid}/groupIngredient
-          // - ถ้าเป็นรายการ "ของสมาชิก" ให้ส่ง targetUserId = ownerId เพื่อแก้ในตู้ของเจ้าของ
-          const editParams = groupId
-            ? (item.targetGroupId
-                ? { item: { ...item, targetGroupId: groupId } }
-                : { item: { ...item, targetUserId: item.ownerId } })
-            : { item };
-          navigation.navigate('AddEditIngredient', editParams);
+          navigation.navigate('AddEditIngredient', {
+            item: { ...item, targetUserId: item.ownerId }
+          });
         } else {
-          Alert.alert('ไม่สามารถแก้ไขได้', 'คุณสามารถแก้ไขได้เฉพาะรายการที่คุณเพิ่มเองหรือหากคุณเป็นเจ้าของกลุ่ม');
+          Alert.alert('ไม่สามารถแก้ไขได้', 'คุณสามารถแก้ไขได้เฉพาะรายการที่คุณเพิ่มเอง หรือหากคุณเป็นเจ้าของกลุ่ม');
         }
       }}
       style={[
@@ -476,13 +402,7 @@ export default function FridgeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                // เพิ่มวัตถุดิบ:
-                // - โหมดกลุ่ม: ใส่ targetGroupId เพื่อเพิ่มลง groups/{gid}/groupIngredient
-                // - โหมดเดี่ยว: ไม่ต้องส่งอะไร
-                const addParams = groupId
-                  ? { targetGroupId: groupId, addedBy: userId }
-                  : {};
-                navigation.navigate('AddEditIngredient', addParams);
+                navigation.navigate('AddEditIngredient', {});
               }}
               style={[styles.iconButton, styles.addButton]}
             >
@@ -524,7 +444,7 @@ export default function FridgeScreen() {
 
         <FlatList
           data={filtered}
-          keyExtractor={(item, idx) => `${item.targetGroupId ? 'G' : (item.ownerId || 'X')}_${item.id}_${idx}`}
+          keyExtractor={(item, idx) => `${item.ownerId}_${item.id}_${idx}`}
           contentContainerStyle={{ paddingBottom: 20 }}
           renderItem={renderItem}
           ListEmptyComponent={
@@ -535,12 +455,7 @@ export default function FridgeScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.emptyButton}
-                onPress={() => {
-                  const addParams = groupId
-                    ? { targetGroupId: groupId, addedBy: userId }
-                    : {};
-                  navigation.navigate('AddEditIngredient', addParams);
-                }}
+                onPress={() => navigation.navigate('AddEditIngredient', {})}
               >
                 <Text style={styles.emptyButtonText}>เพิ่มวัตถุดิบแรก</Text>
               </TouchableOpacity>

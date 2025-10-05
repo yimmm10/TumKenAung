@@ -106,7 +106,7 @@ export default function FamilyGroupScreen({ navigation }) {
     
     Alert.alert(
       'สร้างกลุ่มครอบครัว',
-      'คุณต้องการสร้างตู้เย็นกลุ่มใหม่ใช่หรือไม่?',
+      'คุณต้องการสร้างตู้เย็นกลุ่มใหม่ใช่หรือไม่?\n\nตู้เย็นส่วนตัวของคุณจะกลายเป็นตู้เย็นกลุ่มที่สมาชิกทุกคนเข้าถึงได้',
       [
         { text: 'ยกเลิก', style: 'cancel' },
         {
@@ -138,6 +138,7 @@ export default function FamilyGroupScreen({ navigation }) {
               });
               
               // อัพเดท groupId ในโปรไฟล์ผู้ใช้
+              // ⚠️ ไม่ต้องย้ายวัตถุดิบ เพราะจะใช้ของเดิมที่อยู่ใน users/{userId}/userIngredient
               const userRef = doc(db, 'users', userId);
               await updateDoc(userRef, {
                 groupId: newGroupId
@@ -145,7 +146,7 @@ export default function FamilyGroupScreen({ navigation }) {
               
               Alert.alert(
                 'สำเร็จ!',
-                `สร้างกลุ่มสำเร็จ\nรหัสกลุ่ม: ${newGroupCode}\n\nแชร์รหัสนี้กับสมาชิกในครอบครัวเพื่อเข้าร่วมกลุ่ม`,
+                `สร้างกลุ่มสำเร็จ\nรหัสกลุ่ม: ${newGroupCode}\n\nแชร์รหัสนี้กับสมาชิกในครอบครัวเพื่อเข้าร่วมกลุ่ม\n\nวัตถุดิบในตู้ของคุณจะถูกแชร์ให้สมาชิกทุกคนเห็น`,
                 [{ text: 'ตรวจสอบ', onPress: () => loadUserData(userId) }]
               );
               
@@ -781,5 +782,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     color: '#4a7c4a',
-    lineHeight: 22},
+    lineHeight: 22,
+  },
 });
