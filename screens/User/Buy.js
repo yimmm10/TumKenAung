@@ -318,7 +318,7 @@ export default function Buy() {
 const CARD_W = 150;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#769128' }, // เหลืองอ่อน
+  container: { flex: 1, backgroundColor: '#FFF8E1' }, // เหลืองอ่อน
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   // Header wrap + logo

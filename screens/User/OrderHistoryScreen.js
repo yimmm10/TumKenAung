@@ -13,14 +13,14 @@ import {
 import { db, auth } from '../../firebaseconfig';
 
 const THEME = {
-  green:  '#769128',
+  green:  '#425010',
   orange: '#FFA920',
   yellow: '#FBDB58',
   text:   '#1C1917',
   muted:  '#6B7280',
   line:   '#E5E7EB',
   card:   '#FFFFFF',
-  bg:     '#F9FAFB',
+  bg:     '#FFF8E1',
 };
 
 const statusMeta = {

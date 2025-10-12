@@ -189,7 +189,7 @@ export default function VendorShopScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <View style={{ flex: 1, backgroundColor: '#FFF8E1' }}>
       <FlatList
         ListHeaderComponent={
           <View style={styles.header}>
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { color:'#fff', fontSize:10, fontWeight:'700' },
 
-  header: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 },
+  header: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 , backgroundColor:'#FFF8E1'},
   avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor:'#F5F5F5' },
   avatarPlaceholder: { alignItems:'center', justifyContent:'center', borderWidth:1, borderColor:'#EEE' },
   vendorName: { fontSize:18, fontWeight:'700' },

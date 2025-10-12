@@ -1,5 +1,5 @@
 // screens/User/SavedRecipesScreen.js
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useLayoutEffect, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Image, TouchableOpacity,
   ActivityIndicator, Alert, ScrollView, Platform, TextInput
@@ -352,100 +352,129 @@ const canCookWithFridge = (recipe, map) => {
     );
   };
 
+  useLayoutEffect(() => {
+  navigation.setOptions({
+    headerTitle: () => (
+      <View style={styles.headerTitleWrap}>
+        <Image source={require('../../assets/logo.png')} style={styles.headerLogo} />
+        <Text style={styles.headerTitleText}>สูตรอาหาร</Text>
+      </View>
+    ),
+    headerRight: () => (
+      <TouchableOpacity 
+        onPress={onAdd} 
+        style={styles.headerIconButton}
+      >
+        <Ionicons name="add-circle-outline" size={24} color="#FFF" />
+      </TouchableOpacity>
+    ),
+    headerStyle: { backgroundColor: '#425010' },
+    headerTintColor: '#fff',
+    headerShown: true,
+  });
+}, [navigation]);
+
   // ----------------- UI -----------------
-  return (
-    <SafeAreaView style={styles.safeContainer}>
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Ionicons name="restaurant" size={20} color="#fff" />
-            <Text style={styles.headerTitle}>สูตรอาหาร</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={onAdd} style={styles.headerIconBtn}>
-              <Ionicons name="add-circle-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ✅ กล่องค้นหา (ค้างบนจอเสมอ) */}
-        <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={THEME.subText} style={{ marginHorizontal: 8 }} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="ค้นหาชื่อเมนู หรือชื่อผู้เขียน"
-            placeholderTextColor={THEME.subText}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-          {!!search && (
-            <TouchableOpacity onPress={() => setSearch('')} style={{ paddingHorizontal: 8 }}>
-              <Ionicons name="close-circle" size={18} color={THEME.subText} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* List */}
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={THEME.green} />
-            <Text style={{ marginTop: 12, color: THEME.greenDark, fontSize: 16 }}>กำลังโหลดเมนู…</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="restaurant-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyTitle}>ไม่พบเมนูในหมวดนี้</Text>
-                <Text style={styles.emptySubtitle}>
-                </Text>
-              </View>
-            }
-          />
+return (
+  <SafeAreaView style={styles.safeContainer} edges={['left', 'right']}>
+    <View style={styles.container}>
+      {/* Search */}
+      <View style={styles.searchWrap}>
+        <Ionicons name="search" size={18} color="#666" style={{ marginHorizontal: 8 }} />
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="ค้นหาชื่อเมนู หรือชื่อผู้เขียน"
+          placeholderTextColor="#999"
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
+        {!!search && (
+          <TouchableOpacity onPress={() => setSearch('')} style={{ paddingHorizontal: 8 }}>
+            <Ionicons name="close-circle" size={18} color="#999" />
+          </TouchableOpacity>
         )}
       </View>
-    </SafeAreaView>
-  );
+
+      {/* List */}
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#F7F0CE" />
+          <Text style={{ marginTop: 12, color: '#F7F0CE', fontSize: 16 }}>กำลังโหลดเมนู…</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="restaurant-outline" size={64} color="#F7F0CE" />
+              <Text style={styles.emptyTitle}>ไม่พบเมนูในหมวดนี้</Text>
+            </View>
+          }
+        />
+      )}
+    </View>
+  </SafeAreaView>
+);
 }
 
 /* ======================= Styles ======================= */
 const styles = StyleSheet.create({
   safeContainer: { 
     flex: 1, 
-    backgroundColor: THEME.bg 
+    backgroundColor: '#425010'  // เขียวเข้ม
   },
   container: { 
     flex: 1, 
-    backgroundColor: THEME.bg 
+    backgroundColor: '#FFF8E1' // เขียวกลาง
   },
+  // เพิ่มใน styles
+headerTitleWrap: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+headerLogo: {
+  width: 32,
+  height: 32,
+  marginRight: 8,
+  borderRadius: 6,
+},
 
-  // Header
+headerTitleText: {
+  color: '#FFF',
+  fontSize: 18,
+  fontWeight: 'bold',
+},
+headerIconButton: {
+  paddingRight: 12,
+  paddingLeft: 8,
+},
+  
+
+  // Header (ใช้สไตล์จาก Buy.js)
   header: {
     height: 60,
-    backgroundColor: THEME.green,
+    backgroundColor: '#425010',  // เขียวเข้ม
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...Platform.select({
-      ios: { shadowColor: THEME.shadow, shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
-      android: { elevation: 4 },
-      default: {},
-    }),
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   headerLeft: { 
     flexDirection: 'row', 
     alignItems: 'center' 
   },
   headerTitle: { 
-    color: '#fff', 
+    color: '#FFF', 
     fontSize: 20, 
     fontWeight: '800', 
     marginLeft: 10 
@@ -460,48 +489,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)'
   },
 
-  // Chips
-  chipBar: { 
-    paddingTop: 12, 
-    paddingBottom: 8,
-    backgroundColor: THEME.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.border,
-  },
-  chipContent: { 
-    paddingHorizontal: 16, 
-    alignItems: 'center' 
-  },
-  chip: {
-    backgroundColor: THEME.chipBg,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: THEME.border,
-    marginRight: 10,
-    shadowColor: THEME.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  chipActive: { 
-    backgroundColor: THEME.yellow, 
-    borderColor: THEME.yellow,
-    shadowOpacity: 0.15,
-  },
-  chipText: { 
-    color: THEME.text, 
-    fontSize: 14, 
-    fontWeight: '600' 
-  },
-  chipTextActive: { 
-    color: '#fff', 
-    fontWeight: '700' 
-  },
-
-  // ✅ Search (ค้างบนจอ)
+  // Search (คล้าย Buy.js)
   searchWrap: {
     marginHorizontal: 16,
     marginTop: 8,
@@ -509,7 +497,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: '#ddd',
     minHeight: 40,
     paddingVertical: 6,
     flexDirection: 'row',
@@ -517,7 +505,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: THEME.text,
+    color: '#425010',  // เขียวเข้ม
     paddingVertical: 6,
     fontSize: 14,
   },
@@ -539,13 +527,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#999',
+    color: '#F7F0CE',  // เหลืองอ่อน
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#999',
+    color: '#F7F0CE',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -553,38 +541,38 @@ const styles = StyleSheet.create({
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.green,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
     gap: 8,
   },
   emptyButtonText: {
-    color: 'white',
+    color: '#425010',  // เขียวเข้ม
     fontWeight: 'bold',
   },
 
-  // Card
+  // Recipe cards (ใช้สไตล์การ์ดจาก Buy.js)
   card: {
     flexDirection: 'row',
-    backgroundColor: THEME.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 12,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: THEME.border,
-    ...Platform.select({
-      ios: { shadowColor: THEME.shadow, shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-      android: { elevation: 3 },
-      default: {},
-    }),
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   imageWrap: { 
     width: 100, 
     height: 100, 
     borderRadius: 14, 
     overflow: 'hidden', 
-    backgroundColor: '#EDEDED',
+    backgroundColor: '#FEF9C3',  // เหลืองอ่อน
     position: 'relative'
   },
   cardImage: { 
@@ -615,23 +603,23 @@ const styles = StyleSheet.create({
   cardTitle: { 
     fontSize: 16, 
     fontWeight: '800', 
-    color: THEME.green,
+    color: '#000000ff',  // ดำ
     flex: 1,
     minWidth: 0
   },
   ownerBadge: {
-    backgroundColor: THEME.yellow,
+    backgroundColor: '#F7F0CE',  // เหลืองอ่อน
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
   },
   ownerBadgeText: {
-    color: 'white',
+    color: '#425010',  // เขียวเข้ม
     fontSize: 10,
     fontWeight: 'bold',
   },
   cardSummary: { 
-    color: THEME.text, 
+    color: '#666', 
     fontSize: 13, 
     lineHeight: 18,
     marginBottom: 8,
@@ -643,11 +631,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   authorText: { 
-    color: THEME.subText, 
+    color: '#666', 
     fontSize: 12 
   },
   durationText: {
-    color: THEME.green,
+    color: '#769128',  // เขียวกลาง
     fontSize: 12,
     fontWeight: '600',
   },
@@ -663,17 +651,18 @@ const styles = StyleSheet.create({
   },
   ownerTxt: { 
     fontSize: 12, 
-    fontWeight: '600'
+    fontWeight: '600',
+    color: '#769128'  // เขียวกลาง
   },
   statusBadge: {
-   paddingHorizontal: 8,
-   paddingVertical: 2,
-   borderRadius: 10,
- },
- statusBadgeText: {
-   color: 'white',
-   fontSize: 10,
-   fontWeight: 'bold',
-   letterSpacing: 0.3,
- },
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  statusBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
+  },
 });

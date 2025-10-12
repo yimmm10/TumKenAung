@@ -20,6 +20,7 @@ import MemberItem from '../screens/User/MemberItem';
 import OrderHistoryScreen from '../screens/User/OrderHistoryScreen';
 import CommentScreen from '../screens/User/CommentScreen';
 import FamilyGroupScreen from '../screens/User/FamilyGroupScreen';
+import ReviewWriteScreen from '../screens/User/ReviewWriteScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -44,6 +45,7 @@ export default function AppNavigator() {
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
       <Stack.Screen name="Cart" component={CartScreen} />
       <Stack.Screen name="VendorShop" component={VendorShopScreen} options={{ headerShown: true }} />
+      <Stack.Screen name="Reviews" component={ReviewWriteScreen} options={{ headerShown: true }} />
       <Stack.Screen name="AdminVendorShop" component={AdminVendorShopScreen} options={{ title: 'รายละเอียดร้าน (แอดมิน)' }}/>
    </Stack.Navigator>
   );

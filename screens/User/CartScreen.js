@@ -19,7 +19,7 @@ import QRCode from 'react-native-qrcode-svg';
 const THEME = {
   orange: '#FFA920',
   yellow: '#FBDB58',
-  green:  '#769128',
+  green:  '#425010',
   bg:     '#FFFDF5',
   text:   '#1C1917',
   muted:  '#6B7280',

@@ -18,13 +18,11 @@ export default function FamilyGroupScreen({ navigation }) {
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // สถานะกลุ่ม
   const [groupId, setGroupId] = useState(null);
   const [groupCode, setGroupCode] = useState('');
-  const [userRole, setUserRole] = useState(null); // 'host' หรือ 'member'
+  const [userRole, setUserRole] = useState(null);
   const [groupMembers, setGroupMembers] = useState([]);
   
-  // สำหรับเข้าร่วมกลุ่ม
   const [joinCode, setJoinCode] = useState('');
   const [joiningGroup, setJoiningGroup] = useState(false);
 
@@ -42,7 +40,6 @@ export default function FamilyGroupScreen({ navigation }) {
     loadUserData(user.uid);
   }, []);
 
-  // โหลดข้อมูลผู้ใช้และกลุ่ม
   const loadUserData = async (uid) => {
     try {
       const userRef = doc(db, 'users', uid);
@@ -54,7 +51,6 @@ export default function FamilyGroupScreen({ navigation }) {
         
         const gid = userData.groupId;
         if (gid) {
-          // มีกลุ่มอยู่แล้ว
           setGroupId(gid);
           await loadGroupData(gid, uid);
         } else {
@@ -71,7 +67,6 @@ export default function FamilyGroupScreen({ navigation }) {
     }
   };
 
-  // โหลดข้อมูลกลุ่ม
   const loadGroupData = async (gid, uid) => {
     try {
       const groupRef = doc(db, 'groups', gid);
@@ -81,7 +76,6 @@ export default function FamilyGroupScreen({ navigation }) {
         const groupData = groupSnap.data();
         setGroupCode(groupData.groupCode || gid);
         
-        // โหลดสมาชิก
         const membersRef = collection(db, 'groups', gid, 'members');
         const membersSnap = await getDocs(membersRef);
         const membersList = membersSnap.docs.map(d => ({
@@ -91,7 +85,6 @@ export default function FamilyGroupScreen({ navigation }) {
         
         setGroupMembers(membersList);
         
-        // หา role ของผู้ใช้
         const myRole = membersList.find(m => m.id === uid)?.role;
         setUserRole(myRole);
       }
@@ -100,7 +93,6 @@ export default function FamilyGroupScreen({ navigation }) {
     }
   };
 
-  // สร้างกลุ่มใหม่
   const createNewGroup = async () => {
     if (!userId) return;
     
@@ -115,11 +107,9 @@ export default function FamilyGroupScreen({ navigation }) {
             try {
               setLoading(true);
               
-              // สร้างรหัสกลุ่ม 6 หลัก
               const newGroupCode = generateGroupCode();
               const newGroupId = `group_${Date.now()}_${userId.substring(0, 6)}`;
               
-              // สร้างเอกสารกลุ่ม
               const groupRef = doc(db, 'groups', newGroupId);
               await setDoc(groupRef, {
                 groupCode: newGroupCode,
@@ -128,7 +118,6 @@ export default function FamilyGroupScreen({ navigation }) {
                 createdBy: userId
               });
               
-              // เพิ่มตัวเองเป็นสมาชิกและเป็น host
               const memberRef = doc(db, 'groups', newGroupId, 'members', userId);
               await setDoc(memberRef, {
                 name: userName,
@@ -137,8 +126,6 @@ export default function FamilyGroupScreen({ navigation }) {
                 joinedAt: new Date().toISOString()
               });
               
-              // อัพเดท groupId ในโปรไฟล์ผู้ใช้
-              // ⚠️ ไม่ต้องย้ายวัตถุดิบ เพราะจะใช้ของเดิมที่อยู่ใน users/{userId}/userIngredient
               const userRef = doc(db, 'users', userId);
               await updateDoc(userRef, {
                 groupId: newGroupId
@@ -162,9 +149,8 @@ export default function FamilyGroupScreen({ navigation }) {
     );
   };
 
-  // สุ่มรหัสกลุ่ม 6 หลัก (ตัวอักษรและตัวเลข)
   const generateGroupCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ตัดตัวที่สับสนออก
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -172,7 +158,6 @@ export default function FamilyGroupScreen({ navigation }) {
     return code;
   };
 
-  // เข้าร่วมกลุ่ม
   const joinGroup = async () => {
     if (!joinCode.trim()) {
       Alert.alert('กรุณากรอกรหัส', 'กรุณากรอกรหัสกลุ่มที่ต้องการเข้าร่วม');
@@ -182,7 +167,6 @@ export default function FamilyGroupScreen({ navigation }) {
     try {
       setJoiningGroup(true);
       
-      // ค้นหากลุ่มจากรหัส
       const groupsRef = collection(db, 'groups');
       const groupsSnap = await getDocs(groupsRef);
       
@@ -198,7 +182,6 @@ export default function FamilyGroupScreen({ navigation }) {
         return;
       }
       
-      // เช็คว่าอยู่ในกลุ่มนี้แล้วหรือไม่
       const memberRef = doc(db, 'groups', targetGroupId, 'members', userId);
       const memberSnap = await getDoc(memberRef);
       
@@ -207,7 +190,6 @@ export default function FamilyGroupScreen({ navigation }) {
         return;
       }
       
-      // เข้าร่วมกลุ่ม
       await setDoc(memberRef, {
         name: userName,
         displayName: userName,
@@ -215,7 +197,6 @@ export default function FamilyGroupScreen({ navigation }) {
         joinedAt: new Date().toISOString()
       });
       
-      // อัพเดท groupId ในโปรไฟล์
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, {
         groupId: targetGroupId
@@ -237,7 +218,6 @@ export default function FamilyGroupScreen({ navigation }) {
     }
   };
 
-  // ออกจากกลุ่ม
   const leaveGroup = async () => {
     if (!groupId || !userId) return;
     
@@ -256,10 +236,8 @@ export default function FamilyGroupScreen({ navigation }) {
               setLoading(true);
               
               if (userRole === 'host') {
-                // เจ้าของกลุ่ม: ยุบกลุ่ม
                 await dissolveGroup();
               } else {
-                // สมาชิก: ออกจากกลุ่ม
                 await removeMemberFromGroup(userId);
               }
               
@@ -278,52 +256,43 @@ export default function FamilyGroupScreen({ navigation }) {
     );
   };
 
-  // ยุบกลุ่ม (เจ้าของกลุ่ม)
   const dissolveGroup = async () => {
     if (!groupId) return;
     
     const batch = writeBatch(db);
     
-    // ลบ groupId จากโปรไฟล์สมาชิกทุกคน
     for (const member of groupMembers) {
       const memberUserRef = doc(db, 'users', member.id);
       batch.update(memberUserRef, { groupId: null });
     }
     
-    // ลบเอกสารสมาชิก
     for (const member of groupMembers) {
       const memberRef = doc(db, 'groups', groupId, 'members', member.id);
       batch.delete(memberRef);
     }
     
-    // ลบวัตถุดิบกลางของกลุ่ม (ถ้ามี)
     const groupIngredientsRef = collection(db, 'groups', groupId, 'groupIngredient');
     const groupIngsSnap = await getDocs(groupIngredientsRef);
     groupIngsSnap.docs.forEach(docSnap => {
       batch.delete(docSnap.ref);
     });
     
-    // ลบเอกสารกลุ่ม
     const groupRef = doc(db, 'groups', groupId);
     batch.delete(groupRef);
     
     await batch.commit();
   };
 
-  // ลบสมาชิกออกจากกลุ่ม
   const removeMemberFromGroup = async (memberId) => {
     if (!groupId) return;
     
-    // ลบเอกสารสมาชิก
     const memberRef = doc(db, 'groups', groupId, 'members', memberId);
     await deleteDoc(memberRef);
     
-    // ลบ groupId จากโปรไฟล์
     const userRef = doc(db, 'users', memberId);
     await updateDoc(userRef, { groupId: null });
   };
 
-  // เตะสมาชิกออก (เฉพาะ host)
   const kickMember = (member) => {
     Alert.alert(
       'ยืนยันการเตะสมาชิกออก',
@@ -348,7 +317,6 @@ export default function FamilyGroupScreen({ navigation }) {
     );
   };
 
-  // แสดงรายการสมาชิก
   const renderMember = ({ item }) => (
     <View style={styles.memberCard}>
       <View style={styles.memberInfo}>
@@ -356,7 +324,7 @@ export default function FamilyGroupScreen({ navigation }) {
           <Ionicons 
             name={item.role === 'host' ? 'star' : 'person'} 
             size={24} 
-            color={item.role === 'host' ? '#f4a261' : '#6a994e'} 
+            color={item.role === 'host' ? '#F7F0CE' : '#425010'} 
           />
         </View>
         <View style={styles.memberDetails}>
@@ -383,165 +351,168 @@ export default function FamilyGroupScreen({ navigation }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#6a994e" style={{ marginTop: 50 }} />
+      <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color="#F7F0CE" />
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>จัดการกลุ่มครอบครัว</Text>
-          <View style={{ width: 40 }} />
-        </View>
-
-        {groupId ? (
-          // มีกลุ่มอยู่แล้ว
-          <>
-            {/* ข้อมูลกลุ่ม */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="people" size={28} color="#6a994e" />
-                <Text style={styles.cardTitle}>ตู้เย็นกลุ่ม</Text>
-              </View>
-              
-              <View style={styles.groupCodeContainer}>
-                <Text style={styles.label}>รหัสกลุ่ม</Text>
-                <View style={styles.codeBox}>
-                  <Text style={styles.groupCodeText}>{groupCode}</Text>
-                  <TouchableOpacity 
-                    onPress={() => {
-                      Alert.alert('รหัสกลุ่ม', `รหัสกลุ่มของคุณคือ: ${groupCode}\n\nแชร์รหัสนี้กับสมาชิกในครอบครัวเพื่อเข้าร่วมกลุ่ม`);
-                    }}
-                  >
-                    <Ionicons name="copy-outline" size={20} color="#6a994e" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.statsContainer}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statNumber}>{groupMembers.length}</Text>
-                  <Text style={styles.statLabel}>สมาชิก</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statNumber}>
-                    {userRole === 'host' ? '🏠' : '👥'}
-                  </Text>
-                  <Text style={styles.statLabel}>
-                    {userRole === 'host' ? 'เจ้าของ' : 'สมาชิก'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* รายการสมาชิก */}
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>สมาชิกในกลุ่ม</Text>
-              <FlatList
-                data={groupMembers}
-                keyExtractor={(item) => item.id}
-                renderItem={renderMember}
-                scrollEnabled={false}
-              />
-            </View>
-
-            {/* ปุ่มออกจากกลุ่ม */}
-            <TouchableOpacity style={styles.leaveButton} onPress={leaveGroup}>
-              <Ionicons name="exit-outline" size={20} color="white" />
-              <Text style={styles.leaveButtonText}>
-                {userRole === 'host' ? 'ยุบกลุ่ม' : 'ออกจากกลุ่ม'}
-              </Text>
+    <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 30 }}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#425010" />
             </TouchableOpacity>
-          </>
-        ) : (
-          // ยังไม่มีกลุ่ม
-          <>
-            {/* สร้างกลุ่มใหม่ */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="add-circle" size={28} color="#6a994e" />
-                <Text style={styles.cardTitle}>สร้างตู้เย็นกลุ่ม</Text>
-              </View>
-              <Text style={styles.description}>
-                สร้างกลุ่มครอบครัวเพื่อแชร์วัตถุดิบร่วมกัน คุณจะได้รับรหัสกลุ่มเพื่อแชร์ให้สมาชิกในครอบครัว
-              </Text>
-              <TouchableOpacity style={styles.primaryButton} onPress={createNewGroup}>
-                <Ionicons name="add" size={20} color="white" />
-                <Text style={styles.primaryButtonText}>สร้างกลุ่มใหม่</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.headerTitle}>จัดการกลุ่มครอบครัว</Text>
+            <View style={{ width: 40 }} />
+          </View>
 
-            {/* เข้าร่วมกลุ่ม */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="enter" size={28} color="#f4a261" />
-                <Text style={styles.cardTitle}>เข้าร่วมกลุ่ม</Text>
-              </View>
-              <Text style={styles.description}>
-                มีรหัสกลุ่มจากสมาชิกในครอบครัวแล้วใช่ไหม? กรอกรหัสด้านล่างเพื่อเข้าร่วมกลุ่ม
-              </Text>
-              
-              <TextInput
-                style={styles.codeInput}
-                placeholder="กรอกรหัสกลุ่ม 6 หลัก"
-                value={joinCode}
-                onChangeText={setJoinCode}
-                maxLength={6}
-                autoCapitalize="characters"
-              />
-              
-              <TouchableOpacity 
-                style={[styles.secondaryButton, joiningGroup && styles.buttonDisabled]} 
-                onPress={joinGroup}
-                disabled={joiningGroup}
-              >
-                {joiningGroup ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <>
-                    <Ionicons name="people" size={20} color="white" />
-                    <Text style={styles.secondaryButtonText}>เข้าร่วมกลุ่ม</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+          {groupId ? (
+            <>
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="people" size={28} color="#425010" />
+                  <Text style={styles.cardTitle}>ตู้เย็นกลุ่ม</Text>
+                </View>
+                
+                <View style={styles.groupCodeContainer}>
+                  <Text style={styles.label}>รหัสกลุ่ม</Text>
+                  <View style={styles.codeBox}>
+                    <Text style={styles.groupCodeText}>{groupCode}</Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        Alert.alert('รหัสกลุ่ม', `รหัสกลุ่มของคุณคือ: ${groupCode}\n\nแชร์รหัสนี้กับสมาชิกในครอบครัวเพื่อเข้าร่วมกลุ่ม`);
+                      }}
+                    >
+                      <Ionicons name="copy-outline" size={20} color="#425010" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
-            {/* คำอธิบายเพิ่มเติม */}
-            <View style={styles.infoCard}>
-              <Ionicons name="information-circle" size={24} color="#6a994e" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>ตู้เย็นกลุ่มคืออะไร?</Text>
-                <Text style={styles.infoText}>
-                  • แชร์วัตถุดิบร่วมกันในครอบครัว{'\n'}
-                  • เห็นวัตถุดิบของทุกคนในกลุ่ม{'\n'}
-                  • เจ้าของกลุ่มจัดการสมาชิกได้{'\n'}
-                  • วัตถุดิบของคุณยังเป็นของคุณเสมอ
+                <View style={styles.statsContainer}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statNumber}>{groupMembers.length}</Text>
+                    <Text style={styles.statLabel}>สมาชิก</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statNumber}>
+                      {userRole === 'host' ? '🏠' : '👥'}
+                    </Text>
+                    <Text style={styles.statLabel}>
+                      {userRole === 'host' ? 'เจ้าของ' : 'สมาชิก'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>สมาชิกในกลุ่ม</Text>
+                <FlatList
+                  data={groupMembers}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderMember}
+                  scrollEnabled={false}
+                />
+              </View>
+
+              <TouchableOpacity style={styles.leaveButton} onPress={leaveGroup}>
+                <Ionicons name="exit-outline" size={20} color="white" />
+                <Text style={styles.leaveButtonText}>
+                  {userRole === 'host' ? 'ยุบกลุ่ม' : 'ออกจากกลุ่ม'}
                 </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="add-circle" size={28} color="#425010" />
+                  <Text style={styles.cardTitle}>สร้างตู้เย็นกลุ่ม</Text>
+                </View>
+                <Text style={styles.description}>
+                  สร้างกลุ่มครอบครัวเพื่อแชร์วัตถุดิบร่วมกัน คุณจะได้รับรหัสกลุ่มเพื่อแชร์ให้สมาชิกในครอบครัว
+                </Text>
+                <TouchableOpacity style={styles.primaryButton} onPress={createNewGroup}>
+                  <Ionicons name="add" size={20} color="white" />
+                  <Text style={styles.primaryButtonText}>สร้างกลุ่มใหม่</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </>
-        )}
-      </ScrollView>
+
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="enter" size={28} color='#425010' />
+                  <Text style={styles.cardTitle}>เข้าร่วมกลุ่ม</Text>
+                </View>
+                <Text style={styles.description}>
+                  มีรหัสกลุ่มจากสมาชิกในครอบครัวแล้วใช่ไหม? กรอกรหัสด้านล่างเพื่อเข้าร่วมกลุ่ม
+                </Text>
+                
+                <TextInput
+                  style={styles.codeInput}
+                  placeholder="กรอกรหัสกลุ่ม 6 หลัก"
+                  value={joinCode}
+                  onChangeText={setJoinCode}
+                  maxLength={6}
+                  autoCapitalize="characters"
+                />
+                
+                <TouchableOpacity 
+                  style={[styles.secondaryButton, joiningGroup && styles.buttonDisabled]} 
+                  onPress={joinGroup}
+                  disabled={joiningGroup}
+                >
+                  {joiningGroup ? (
+                    <ActivityIndicator size="small" color="#425010" />
+                  ) : (
+                    <>
+                      <Ionicons name="people" size={20} color="#425010" />
+                      <Text style={styles.secondaryButtonText}>เข้าร่วมกลุ่ม</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.infoCard}>
+                <Ionicons name="information-circle" size={24} color="#425010" />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoTitle}>ตู้เย็นกลุ่มคืออะไร?</Text>
+                  <Text style={styles.infoText}>
+                    • แชร์วัตถุดิบร่วมกันในครอบครัว{'\n'}
+                    • เห็นวัตถุดิบของทุกคนในกลุ่ม{'\n'}
+                    • เจ้าของกลุ่มจัดการสมาชิกได้{'\n'}
+                    • วัตถุดิบของคุณยังเป็นของคุณเสมอ
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: '#425010',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fefae0',
+    backgroundColor: '#FFF8E1',
   },
   scrollView: {
     flex: 1,
     padding: 16,
   },
+  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,7 +524,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -561,14 +532,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 2,
+    borderColor: '#F7F0CE',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000000ff',
   },
+  
   card: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -577,6 +551,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+    borderWidth: 2,
+    borderColor: '#F7F0CE',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -586,7 +562,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#425010',
     marginLeft: 10,
   },
   description: {
@@ -595,32 +571,34 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 20,
   },
+  
   groupCodeContainer: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    color: '#666',
+    color: '#425010',
     marginBottom: 8,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   codeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FEF9C3',
     padding: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#6a994e',
+    borderColor: '#F7F0CE',
     borderStyle: 'dashed',
   },
   groupCodeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#6a994e',
+    color: '#425010',
     letterSpacing: 4,
   },
+  
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -628,31 +606,40 @@ const styles = StyleSheet.create({
   },
   statBox: {
     alignItems: 'center',
+    backgroundColor: '#FEF9C3',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minWidth: 100,
   },
   statNumber: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#6a994e',
+    color: '#425010',
   },
   statLabel: {
     fontSize: 12,
     color: '#666',
     marginTop: 4,
   },
+  
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#425010',
     marginBottom: 16,
   },
+  
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FEF9C3',
     padding: 12,
     borderRadius: 12,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#F7F0CE',
   },
   memberInfo: {
     flexDirection: 'row',
@@ -663,12 +650,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'white',
+    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
     borderWidth: 2,
-    borderColor: '#e9ecef',
+    borderColor: '#F7F0CE',
   },
   memberDetails: {
     flex: 1,
@@ -676,7 +663,7 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#425010',
     marginBottom: 4,
   },
   memberRole: {
@@ -686,9 +673,10 @@ const styles = StyleSheet.create({
   kickButton: {
     padding: 8,
   },
+  
   codeInput: {
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: '#F7F0CE',
     borderRadius: 12,
     padding: 16,
     fontSize: 18,
@@ -696,12 +684,13 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
     fontWeight: 'bold',
     textTransform: 'uppercase',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF',
     marginBottom: 16,
   },
+  
   primaryButton: {
     flexDirection: 'row',
-    backgroundColor: '#6a994e',
+    backgroundColor: '#425010',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -713,14 +702,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   primaryButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },
   secondaryButton: {
     flexDirection: 'row',
-    backgroundColor: '#f4a261',
+    backgroundColor: '#F7F0CE',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -732,7 +721,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   secondaryButtonText: {
-    color: 'white',
+    color: '#425010',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
@@ -755,19 +744,20 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   leaveButtonText: {
-    color: 'white',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },
+  
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: '#e7f5e7',
+    backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#c3e6c3',
+    borderWidth: 2,
+    borderColor: '#F7F0CE',
   },
   infoContent: {
     flex: 1,
@@ -776,12 +766,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2d6a2d',
+    color: '#425010',
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: '#4a7c4a',
+    color: '#666',
     lineHeight: 22,
   },
 });

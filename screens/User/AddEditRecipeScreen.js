@@ -4,6 +4,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Image, ScrollView, Alert, ActivityIndicator, Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 
@@ -15,17 +16,19 @@ import { getAuth } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import Tag from '../../components/Tag';
 
+// ธีมสีตาม Buy.js
 const THEME = {
-  bg: '#f2f2d9',
-  card: '#fbf6e3',
-  green: '#5e7f1a',
-  greenDark: '#3e5a0b',
-  yellow: '#ffd44d',
+  bgMain: '#FFF8E1',      // เขียวกลาง
+  bgDark: '#425010',      // เขียวเข้ม
+  card: '#FFFFFF',        // ขาว
+  yellow: '#F7F0CE',      // เหลืองอ่อน
+  yellowLight: '#FEF9C3', // เหลืองอ่อนมาก
   gray: '#98a2b3',
-  danger: '#c83d3d',
+  danger: '#d62828',
+  text: '#425010',        // เขียวเข้ม
+  textLight: '#FFF',
 };
 
-const CATEGORIES = ['สูตรทำกินเอง', 'สูตรทางบ้าน', 'สูตรรักษ์สุขภาพ'];
 const sanitize = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
 /** ตรวจสอบสิทธิ์ admin */
@@ -56,31 +59,24 @@ export default function AddEditRecipe({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [tags, setTags]   = useState([]);
+  const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
-  // ฟอร์มหลัก
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  
   const [imageUrl, setImageUrl] = useState('');
-  const [imagePath, setImagePath] = useState(''); // path ใน storage
-
-  // รายการย่อย
-  const [ingredients, setIngredients] = useState([]); // [{name, part, qty, unit}]
-  const [seasonings, setSeasonings] = useState([]);   // string[]
-  const [equipments, setEquipments] = useState([]);   // string[]
-  const [steps, setSteps] = useState([]);             // string[]
-
-  // ตัวเลือกวัตถุดิบจาก Firestore -> ingredientOptions
-  const [ingOptions, setIngOptions] = useState([]);   // [{id, name, defaultUnit, defaultPart}]
+  const [imagePath, setImagePath] = useState('');
+  const [ingredients, setIngredients] = useState([]);
+  const [seasonings, setSeasonings] = useState([]);
+  const [equipments, setEquipments] = useState([]);
+  const [steps, setSteps] = useState([]);
+  const [ingOptions, setIngOptions] = useState([]);
   const [ingOptLoading, setIngOptLoading] = useState(true);
   const [openUnitIdx, setOpenUnitIdx] = useState(null);
-  // โหลดสิทธิ์
+
   useEffect(() => {
     (async () => setIsAdmin(await checkIsAdmin(db, auth)))();
   }, []);
 
-  // โหลดเดิมถ้ามี recipeId
   useEffect(() => {
     (async () => {
       try {
@@ -99,7 +95,6 @@ export default function AddEditRecipe({ route, navigation }) {
         setDescription(d.description || '');
         setImageUrl(d.imageUrl || '');
         setImagePath(d.imagePath || '');
-
         setIngredients(Array.isArray(d.ingredients) ? d.ingredients : []);
         setSeasonings(Array.isArray(d.seasonings) ? d.seasonings : []);
         setEquipments(Array.isArray(d.equipments) ? d.equipments : []);
@@ -114,40 +109,35 @@ export default function AddEditRecipe({ route, navigation }) {
     })();
   }, [recipeId, navigation]);
 
-  // โหลด ingredientOptions ทั้งชุดแล้วกรองในเครื่อง
   useEffect(() => {
-  (async () => {
-    try {
-      setIngOptLoading(true);
-      const snap = await getDocs(collection(db, 'ingredientOptions'));
-      const rows = snap.docs.map(d => {
-        const x = d.data() || {};
-        const name = sanitize(
-          x.name ?? x.label ?? x.title ?? x.text ?? x.value ?? ''
-        );
-        // รองรับ units เป็น array
-        const unitsArr = Array.isArray(x.units) ? x.units.map(sanitize).filter(Boolean) : [];
-        const defaultUnit = sanitize(x.defaultUnit ?? x.unit ?? (unitsArr[0] ?? ''));
-        const defaultPart = sanitize(x.defaultPart ?? x.part ?? '');
-        return {
-          id: d.id,
-          name,
-          defaultUnit,
-          defaultPart,
-          units: unitsArr,
-        };
-      }).filter(o => o.name);  // ต้องมีชื่อถึงจะเอา
-      rows.sort((a, b) => a.name.localeCompare(b.name, 'th'));
-      setIngOptions(rows);
-    } catch (e) {
-      console.warn('load ingredientOptions error:', e?.message);
-    } finally {
-      setIngOptLoading(false);
-    }
-  })();
-}, []);
+    (async () => {
+      try {
+        setIngOptLoading(true);
+        const snap = await getDocs(collection(db, 'ingredientOptions'));
+        const rows = snap.docs.map(d => {
+          const x = d.data() || {};
+          const name = sanitize(x.name ?? x.label ?? x.title ?? x.text ?? x.value ?? '');
+          const unitsArr = Array.isArray(x.units) ? x.units.map(sanitize).filter(Boolean) : [];
+          const defaultUnit = sanitize(x.defaultUnit ?? x.unit ?? (unitsArr[0] ?? ''));
+          const defaultPart = sanitize(x.defaultPart ?? x.part ?? '');
+          return {
+            id: d.id,
+            name,
+            defaultUnit,
+            defaultPart,
+            units: unitsArr,
+          };
+        }).filter(o => o.name);
+        rows.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+        setIngOptions(rows);
+      } catch (e) {
+        console.warn('load ingredientOptions error:', e?.message);
+      } finally {
+        setIngOptLoading(false);
+      }
+    })();
+  }, []);
 
-  // ===== เลือกรูป + อัปโหลด =====
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -184,7 +174,6 @@ export default function AddEditRecipe({ route, navigation }) {
     }
   };
 
-  // ===== บันทึก (มี Moderation Flow) =====
   const onSave = async () => {
     if (!title.trim()) {
       Alert.alert('กรอกไม่ครบ', 'กรุณาใส่ชื่อเมนู');
@@ -261,10 +250,9 @@ export default function AddEditRecipe({ route, navigation }) {
     }
   };
 
-  // ===== ลบเมนู =====
   const onDelete = async () => {
     if (!recipeId) return;
-    Alert.alert('ยืนยันการลบ', `ลบ “${title || 'เมนู'}” ?`, [
+    Alert.alert('ยืนยันการลบ', `ลบ "${title || 'เมนู'}" ?`, [
       { text: 'ยกเลิก', style: 'cancel' },
       {
         text: 'ลบ', style: 'destructive', onPress: async () => {
@@ -284,196 +272,227 @@ export default function AddEditRecipe({ route, navigation }) {
   };
 
   const addTag = () => {
-  const v = (tagInput || '').trim();
-  if (!v) return;
-  // กันซ้ำ และจำกัดจำนวน (เช่น 8 แท็ก)
-  if (tags.includes(v)) return;
-  if (tags.length >= 8) return Alert.alert('ใส่แท็กได้สูงสุด 8 รายการ');
-  setTags(prev => [...prev, v]);
-  setTagInput('');
-};
-const removeTag = (idx) => {
-  setTags(prev => prev.filter((_, i) => i !== idx));
-};
+    const v = (tagInput || '').trim();
+    if (!v) return;
+    if (tags.includes(v)) return;
+    if (tags.length >= 8) return Alert.alert('ใส่แท็กได้สูงสุด 8 รายการ');
+    setTags(prev => [...prev, v]);
+    setTagInput('');
+  };
+
+  const removeTag = (idx) => {
+    setTags(prev => prev.filter((_, i) => i !== idx));
+  };
 
   if (loading) {
     return (
-      <View style={[styles.center, { flex: 1, backgroundColor: THEME.bg }]}>
-        <ActivityIndicator size="large" color={THEME.green} />
-        <Text style={{ marginTop: 8, color: THEME.greenDark }}>กำลังโหลด…</Text>
-      </View>
+      <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
+        <View style={[styles.center, { flex: 1 }]}>
+          <ActivityIndicator size="large" color="#F7F0CE" />
+          <Text style={{ marginTop: 8, color: '#FFF' }}>กำลังโหลด…</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: THEME.bg }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 6 }}>
-          <Ionicons name="chevron-back" size={22} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{recipeId ? 'แก้ไขสูตรอาหาร' : 'เพิ่มสูตรอาหาร'}</Text>
-        {!!recipeId ? (
-          <TouchableOpacity onPress={onDelete} style={{ padding: 6 }}>
-            <MaterialIcons name="delete" size={22} color={THEME.danger} />
+    <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
-        ) : <View style={{ width: 28 }} /> }
-      </View>
-
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="always">
-        {/* การ์ดฟอร์ม */}
-        <View style={styles.card}>
-          {/* รูป */}
-          <TouchableOpacity style={styles.imageBox} onPress={pickImage} activeOpacity={0.8}>
-            {imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={styles.image} />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Ionicons name="image" size={26} color={THEME.gray} />
-                <Text style={{ color: THEME.gray, marginTop: 6 }}>เลือกรูป</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* ชื่อ + คำอธิบาย */}
-          <Label text="ชื่อเมนู" />
-          <TextInput
-            style={styles.input}
-            placeholder="Placeholder"
-            value={title}
-            onChangeText={setTitle}
-          />
-          <Label text="คำอธิบาย" />
-          <TextInput
-            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-            placeholder="Placeholder"
-            multiline
-            value={description}
-            onChangeText={setDescription}
-          />
-          <Text style={styles.sectionTitle}>ประเภทอาหาร / แท็ก</Text>
-          <View style={{ flexDirection:'row', alignItems:'center', marginBottom: 8 }}>
-            <TextInput
-              style={[styles.input, { flex:1, marginRight:8 }]}
-              placeholder="พิมพ์แล้วกด + เช่น แกง, ต้ม, เผ็ดน้อย"
-              value={tagInput}
-              onChangeText={setTagInput}
-              onSubmitEditing={addTag}
-              returnKeyType="done"
-            />
-            <TouchableOpacity onPress={addTag} activeOpacity={0.85}>
-              <Ionicons name="add-circle-outline" size={28} color="#4CAF50" />
+          <Text style={styles.headerTitle}>
+            {recipeId ? 'แก้ไขสูตรอาหาร' : 'เพิ่มสูตรอาหาร'}
+          </Text>
+          {!!recipeId ? (
+            <TouchableOpacity onPress={onDelete} style={styles.deleteIconBtn}>
+              <MaterialIcons name="delete" size={22} color="#FFF" />
             </TouchableOpacity>
-          </View>
-
-          {/* ตัวอย่างหมวดที่กดเลือกเร็ว ๆ */}
-          <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom: 8 }}>
-            {['แกง','ผัด','ทอด','ต้ม','ยำ','นึ่ง','สุขภาพ','มังสวิรัติ'].map((s) => (
-              <TouchableOpacity
-                key={s}
-                onPress={() => { setTagInput(''); if (!tags.includes(s)) setTags(prev => [...prev, s]); }}
-                style={{ paddingHorizontal:12, paddingVertical:6, borderRadius:16, backgroundColor:'#FFF7DB', borderWidth:1, borderColor:'#E6E8EC' }}
-              >
-                <Text style={{ color:'#6B7280' }}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* แสดงแท็กที่เลือกแล้ว */}
-          <View style={{ flexDirection:'row', flexWrap:'wrap' }}>
-            {tags.map((t, i) => (
-              <Tag key={i} label={t} onRemove={() => removeTag(i)} />
-            ))}
-          </View>
-
-          {/* วัตถุดิบ */}
-          <SectionHeader
-            title="วัตถุดิบ"
-            onAdd={() => setIngredients((prev) => [...prev, { _id: String(Date.now()),name: '', qty: '', unit: '' }])}
-          />
-          {ingredients.map((it, idx) => (
-            <RowIngredient
-              key={it._id ?? idx}
-              rowIndex={idx}
-              openUnitIdx={openUnitIdx}
-              setOpenUnitIdx={setOpenUnitIdx}
-              value={it}
-              onChange={(key, val) => setIngredients((prev) => prev.map((x, i) => i === idx ? { ...x, [key]: val } : x))}
-              onRemove={() => setIngredients((prev) => prev.filter((_, i) => i !== idx))}
-              options={ingOptions}
-              optionsLoading={ingOptLoading}
-            />
-          ))}
-
-          {/* เครื่องปรุง */}
-          <SectionHeader title="เครื่องปรุง" onAdd={() => setSeasonings((prev) => [...prev, ''])} />
-          {seasonings.map((s, idx) => (
-            <RowSimple
-              key={idx}
-              value={s}
-              onChange={(val) => setSeasonings((prev) => prev.map((x, i) => i === idx ? val : x))}
-              onRemove={() => setSeasonings((prev) => prev.filter((_, i) => i !== idx))}
-              placeholder="เช่น ซอสหอยนางรม 1 ช้อนโต๊ะ"
-            />
-          ))}
-
-          {/* อุปกรณ์ */}
-          <SectionHeader title="อุปกรณ์" onAdd={() => setEquipments((prev) => [...prev, ''])} />
-          {equipments.map((s, idx) => (
-            <RowSimple
-              key={idx}
-              value={s}
-              onChange={(val) => setEquipments((prev) => prev.map((x, i) => i === idx ? val : x))}
-              onRemove={() => setEquipments((prev) => prev.filter((_, i) => i !== idx))}
-              placeholder="เช่น กระทะ ตะหลิว"
-            />
-          ))}
-
-          {/* วิธีทำ */}
-          <SectionHeader title="วิธีทำ" onAdd={() => setSteps((prev) => [...prev, ''])} />
-          {steps.map((s, idx) => (
-            <RowSimple
-              key={idx}
-              value={s}
-              onChange={(val) => setSteps((prev) => prev.map((x, i) => i === idx ? val : x))}
-              onRemove={() => setSteps((prev) => prev.filter((_, i) => i !== idx))}
-              placeholder={`ขั้นตอนที่ ${idx + 1}`}
-            />
-          ))}
-
-          {/* ปุ่มบันทึก */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: THEME.green }]}
-              onPress={onSave}
-              disabled={saving}
-            >
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>บันทึก</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: '#c0c7d1' }]}
-              onPress={() => navigation.goBack()}
-              disabled={saving}
-            >
-              <Text style={styles.btnText}>ยกเลิก</Text>
-            </TouchableOpacity>
-          </View>
+          ) : <View style={{ width: 40 }} />}
         </View>
-      </ScrollView>
-    </View>
+
+        <ScrollView 
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }} 
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* การ์ดฟอร์ม */}
+          <View style={styles.card}>
+            {/* รูป */}
+            <TouchableOpacity style={styles.imageBox} onPress={pickImage} activeOpacity={0.8}>
+              {imageUrl ? (
+                <Image source={{ uri: imageUrl }} style={styles.image} />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image" size={32} color={THEME.gray} />
+                  <Text style={{ color: THEME.gray, marginTop: 6, fontWeight: '600' }}>เลือกรูป</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* ชื่อ + คำอธิบาย */}
+            <Label text="ชื่อเมนู *" />
+            <TextInput
+              style={styles.input}
+              placeholder="เช่น ต้มยำกุ้ง, ผัดไทย"
+              placeholderTextColor="#999"
+              value={title}
+              onChangeText={setTitle}
+            />
+
+            <Label text="คำอธิบาย" />
+            <TextInput
+              style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+              placeholder="อธิบายเมนูสั้นๆ"
+              placeholderTextColor="#999"
+              multiline
+              value={description}
+              onChangeText={setDescription}
+            />
+
+            {/* แท็ก */}
+            <Label text="ประเภทอาหาร / แท็ก" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginRight: 8 }]}
+                placeholder="พิมพ์แล้วกด +"
+                placeholderTextColor="#999"
+                value={tagInput}
+                onChangeText={setTagInput}
+                onSubmitEditing={addTag}
+                returnKeyType="done"
+              />
+              <TouchableOpacity onPress={addTag} activeOpacity={0.85}>
+                <Ionicons name="add-circle-outline" size={28} color="#425010" />
+              </TouchableOpacity>
+            </View>
+
+            {/* ตัวอย่างหมวด */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              {['แกง', 'ผัด', 'ทอด', 'ต้ม', 'ยำ', 'นึ่ง', 'สุขภาพ', 'มังสวิรัติ'].map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => {
+                    setTagInput('');
+                    if (!tags.includes(s)) setTags(prev => [...prev, s]);
+                  }}
+                  style={styles.quickTag}
+                >
+                  <Text style={{ color: '#425010', fontWeight: '600' }}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* แท็กที่เลือก */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {tags.map((t, i) => (
+                <Tag key={i} label={t} onRemove={() => removeTag(i)} />
+              ))}
+            </View>
+
+            {/* วัตถุดิบ */}
+            <SectionHeader
+              title="วัตถุดิบ"
+              onAdd={() => setIngredients((prev) => [
+                ...prev,
+                { _id: String(Date.now()), name: '', qty: '', unit: '' }
+              ])}
+            />
+            {ingredients.map((it, idx) => (
+              <RowIngredient
+                key={it._id ?? idx}
+                rowIndex={idx}
+                openUnitIdx={openUnitIdx}
+                setOpenUnitIdx={setOpenUnitIdx}
+                value={it}
+                onChange={(key, val) =>
+                  setIngredients((prev) => prev.map((x, i) => (i === idx ? { ...x, [key]: val } : x)))
+                }
+                onRemove={() => setIngredients((prev) => prev.filter((_, i) => i !== idx))}
+                options={ingOptions}
+                optionsLoading={ingOptLoading}
+              />
+            ))}
+
+            {/* เครื่องปรุง */}
+            <SectionHeader
+              title="เครื่องปรุง"
+              onAdd={() => setSeasonings((prev) => [...prev, ''])}
+            />
+            {seasonings.map((s, idx) => (
+              <RowSimple
+                key={idx}
+                value={s}
+                onChange={(val) => setSeasonings((prev) => prev.map((x, i) => (i === idx ? val : x)))}
+                onRemove={() => setSeasonings((prev) => prev.filter((_, i) => i !== idx))}
+                placeholder="เช่น ซอสหอยนางรม 1 ช้อนโต๊ะ"
+              />
+            ))}
+
+            {/* อุปกรณ์ */}
+            <SectionHeader title="อุปกรณ์" onAdd={() => setEquipments((prev) => [...prev, ''])} />
+            {equipments.map((s, idx) => (
+              <RowSimple
+                key={idx}
+                value={s}
+                onChange={(val) => setEquipments((prev) => prev.map((x, i) => (i === idx ? val : x)))}
+                onRemove={() => setEquipments((prev) => prev.filter((_, i) => i !== idx))}
+                placeholder="เช่น กระทะ ตะหลิว"
+              />
+            ))}
+
+            {/* วิธีทำ */}
+            <SectionHeader title="วิธีทำ" onAdd={() => setSteps((prev) => [...prev, ''])} />
+            {steps.map((s, idx) => (
+              <RowSimple
+                key={idx}
+                value={s}
+                onChange={(val) => setSteps((prev) => prev.map((x, i) => (i === idx ? val : x)))}
+                onRemove={() => setSteps((prev) => prev.filter((_, i) => i !== idx))}
+                placeholder={`ขั้นตอนที่ ${idx + 1}`}
+              />
+            ))}
+
+            {/* ปุ่มบันทึก */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnSave]}
+                onPress={onSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnText}>บันทึก</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnCancel]}
+                onPress={() => navigation.goBack()}
+                disabled={saving}
+              >
+                <Text style={[styles.btnText, { color: '#425010' }]}>ยกเลิก</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
-/* ------------ small components ------------ */
+/* ------------ Small Components ------------ */
 const Label = ({ text }) => (
-  <Text style={{ color: THEME.greenDark, marginTop: 10, marginBottom: 6, fontWeight: '700' }}>{text}</Text>
+  <Text style={styles.label}>{text}</Text>
 );
 
 const SectionHeader = ({ title, onAdd }) => (
   <View style={styles.sectionHeader}>
     <Text style={styles.sectionTitle}>{title}</Text>
     <TouchableOpacity onPress={onAdd} style={styles.addIcon}>
-      <Ionicons name="add" size={18} color="#333" />
+      <Ionicons name="add" size={18} color="#425010" />
     </TouchableOpacity>
   </View>
 );
@@ -485,6 +504,7 @@ const RowSimple = ({ value, onChange, onRemove, placeholder }) => (
       value={value}
       onChangeText={onChange}
       placeholder={placeholder}
+      placeholderTextColor="#999"
     />
     <TouchableOpacity onPress={onRemove} style={styles.removeBtn}>
       <MaterialIcons name="delete" size={20} color="#fff" />
@@ -492,12 +512,15 @@ const RowSimple = ({ value, onChange, onRemove, placeholder }) => (
   </View>
 );
 
-/** แถววัตถุดิบ (มี Auto-suggest จาก ingredientOptions) */
-/** แถววัตถุดิบ (แก้เวอร์ชันนี้) */
 const RowIngredient = ({
-  value, onChange, onRemove,
-  options = [], optionsLoading = false,
-  rowIndex, openUnitIdx, setOpenUnitIdx
+  value,
+  onChange,
+  onRemove,
+  options = [],
+  optionsLoading = false,
+  rowIndex,
+  openUnitIdx,
+  setOpenUnitIdx,
 }) => {
   const [focused, setFocused] = useState(false);
   const unitOpen = openUnitIdx === rowIndex;
@@ -505,14 +528,12 @@ const RowIngredient = ({
   const nameText = String(value?.name || '');
   const query = nameText.trim().toLowerCase();
 
-  // หา option ที่ตรงกับชื่อเพื่อดึง units
   const matchedOption = useMemo(() => {
     const n = (value?.name || '').trim().toLowerCase();
     if (!n) return null;
-    // ใช้ “เท่ากันเป๊ะ” ก่อน ถ้าไม่เจอค่อย fallback เป็น includes
     return (
-      options.find(o => (o.name || '').toLowerCase() === n) ||
-      options.find(o => (o.name || '').toLowerCase().includes(n)) ||
+      options.find((o) => (o.name || '').toLowerCase() === n) ||
+      options.find((o) => (o.name || '').toLowerCase().includes(n)) ||
       null
     );
   }, [options, value?.name]);
@@ -525,19 +546,16 @@ const RowIngredient = ({
     return matchedOption.defaultUnit ? [matchedOption.defaultUnit] : [];
   }, [matchedOption]);
 
-  // รายการแนะนำชื่อ
   const suggestions = useMemo(() => {
     if (!focused || !query) return [];
-    const found = options.filter(o => (o.name || '').toLowerCase().includes(query));
+    const found = options.filter((o) => (o.name || '').toLowerCase().includes(query));
     return found.slice(0, 8);
   }, [options, query, focused]);
 
   const pickSuggestion = (opt) => {
     onChange('name', opt.name);
-    // เติมหน่วยเริ่มต้นถ้ายังไม่มี
-    const firstUnit = (opt.units && opt.units.length) ? opt.units[0] : opt.defaultUnit;
+    const firstUnit = opt.units && opt.units.length ? opt.units[0] : opt.defaultUnit;
     if (!value?.unit && firstUnit) onChange('unit', firstUnit);
-    // ปิด suggestion และเปิด dropdown หน่วยทันที
     setFocused(false);
     setOpenUnitIdx(rowIndex);
   };
@@ -546,16 +564,20 @@ const RowIngredient = ({
     <View
       style={[
         styles.rowIng,
-        unitOpen ? { zIndex: 2000, elevation: 16 } : { zIndex: 1000 - rowIndex }
+        unitOpen ? { zIndex: 2000, elevation: 16 } : { zIndex: 1000 - rowIndex },
       ]}
     >
-      {/* ชื่อวัตถุดิบ + Suggestion */}
+      {/* ชื่อวัตถุดิบ */}
       <View style={[styles.colNameWrap, { flex: 1.2 }]}>
         <TextInput
           style={[styles.input]}
           placeholder="ชื่อ (เช่น ไข่ไก่)"
+          placeholderTextColor="#999"
           value={value.name}
-          onChangeText={(t) => { onChange('name', t); setOpenUnitIdx(null); }}
+          onChangeText={(t) => {
+            onChange('name', t);
+            setOpenUnitIdx(null);
+          }}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 120)}
         />
@@ -563,8 +585,8 @@ const RowIngredient = ({
           <View style={styles.suggestBox}>
             {optionsLoading ? (
               <View style={styles.suggestLoading}>
-                <ActivityIndicator size="small" color={THEME.greenDark} />
-                <Text style={{ marginLeft: 6, color: '#475569' }}>กำลังโหลดตัวเลือก…</Text>
+                <ActivityIndicator size="small" color="#425010" />
+                <Text style={{ marginLeft: 6, color: '#666' }}>กำลังโหลด…</Text>
               </View>
             ) : suggestions.length > 0 ? (
               suggestions.map((opt) => (
@@ -581,7 +603,7 @@ const RowIngredient = ({
               ))
             ) : (
               <View style={styles.suggestEmpty}>
-                <Text style={{ color: '#64748B' }}>ไม่พบ “{nameText}”</Text>
+                <Text style={{ color: '#64748B' }}>ไม่พบ "{nameText}"</Text>
               </View>
             )}
           </View>
@@ -591,6 +613,7 @@ const RowIngredient = ({
       <TextInput
         style={[styles.input, styles.colQty]}
         placeholder="ปริมาณ"
+        placeholderTextColor="#999"
         keyboardType="numeric"
         value={String(value.qty ?? '')}
         onChangeText={(t) => onChange('qty', t)}
@@ -602,15 +625,14 @@ const RowIngredient = ({
           style={styles.unitBox}
           activeOpacity={0.8}
           onPress={() => {
-            // ปิด suggestion เผื่อมันบังปุ่ม
             setFocused(false);
             setOpenUnitIdx(unitOpen ? null : rowIndex);
           }}
         >
           <Text style={styles.unitText} numberOfLines={1}>
-            {value.unit ? String(value.unit) : 'เลือกหน่วย'}
+            {value.unit ? String(value.unit) : 'หน่วย'}
           </Text>
-          <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#111" />
+          <Ionicons name={unitOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#425010" />
         </TouchableOpacity>
 
         {unitOpen && (
@@ -621,14 +643,17 @@ const RowIngredient = ({
                   key={u}
                   style={styles.unitItem}
                   activeOpacity={0.8}
-                  onPressIn={() => { onChange('unit', u); setOpenUnitIdx(null); }}
+                  onPressIn={() => {
+                    onChange('unit', u);
+                    setOpenUnitIdx(null);
+                  }}
                 >
                   <Text style={styles.unitItemText}>{u}</Text>
                 </TouchableOpacity>
               ))
             ) : (
               <View style={styles.unitEmpty}>
-                <Text style={styles.unitEmptyText}>ไม่มีหน่วยสำหรับวัตถุดิบนี้</Text>
+                <Text style={styles.unitEmptyText}>ไม่มีหน่วย</Text>
               </View>
             )}
           </View>
@@ -642,175 +667,315 @@ const RowIngredient = ({
   );
 };
 
-
-/* ----------------- styles ----------------- */
+/* ----------------- Styles ----------------- */
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: THEME.bgDark,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: THEME.bgMain,
+  },
+
+  // Header แบบ Buy.js
   header: {
-    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    backgroundColor: THEME.yellow,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: THEME.bgDark,
   },
-  headerTitle: { fontWeight: '800', fontSize: 16, color: '#333' },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontWeight: '800',
+    fontSize: 20,
+    color: '#FFF',
+  },
+  deleteIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
+  // Card
   card: {
     backgroundColor: THEME.card,
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 }, elevation: 2,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: THEME.yellow,
   },
 
+  // Image
   imageBox: {
-    alignSelf: 'center', width: 140, height: 140,
-    borderRadius: 12, overflow: 'hidden', backgroundColor: '#eee', marginBottom: 10
+    alignSelf: 'center',
+    width: 160,
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: THEME.yellowLight,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: THEME.yellow,
   },
-  image: { width: '100%', height: '100%' },
-  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  input: {
-    backgroundColor: '#f6efc7',
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.select({ ios: 10, android: 8 }),
+  // Input
+  label: {
+    color: THEME.text,
+    marginTop: 12,
+    marginBottom: 6,
+    fontWeight: '700',
     fontSize: 14,
   },
-
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: '#fff', borderRadius: 22, marginRight: 8, marginBottom: 8,
-    borderWidth: 1, borderColor: '#eee'
+  input: {
+    backgroundColor: THEME.yellowLight,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.select({ ios: 12, android: 10 }),
+    fontSize: 14,
+    color: THEME.text,
+    borderWidth: 1,
+    borderColor: THEME.yellow,
   },
-  chipActive: { backgroundColor: THEME.green, borderColor: THEME.green },
-  chipText: { color: '#333', fontWeight: '600' },
 
+  // Quick tags
+  quickTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: THEME.yellowLight,
+    borderWidth: 1,
+    borderColor: THEME.yellow,
+  },
+
+  // Section header
   sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 14, marginBottom: 6
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  sectionTitle: { fontWeight: '800', color: THEME.greenDark },
+  sectionTitle: {
+    fontWeight: '800',
+    color: THEME.text,
+    fontSize: 16,
+  },
   addIcon: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#ffeaa7'
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.yellow,
+    borderWidth: 1,
+    borderColor: THEME.yellow,
   },
 
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  // Row
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   removeBtn: {
-    marginLeft: 8, backgroundColor: THEME.danger,
-    paddingHorizontal: 10, paddingVertical: 10, borderRadius: 16
+    marginLeft: 8,
+    backgroundColor: THEME.danger,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 16,
   },
 
+  // Row Ingredient
   rowIng: {
-  flexDirection:'row',
-  alignItems:'center',
-  marginBottom: 8,
-  position: 'relative',     
-  overflow: 'visible',
-},
-  // เดิม: colName เป็นสไตล์ให้ TextInput โดยตรง → ปรับเป็น wrapper เพื่อวาง Suggestion
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    position: 'relative',
+    overflow: 'visible',
+  },
   colNameWrap: {
-    flex: 1.1,
+    flex: 1.2,
     marginRight: 6,
     position: 'relative',
-    zIndex: 1500, // ให้อยู่เหนือ input อื่น
+    zIndex: 9999,
   },
-  colQty: { width: 80, marginRight: 6 },
-  colUnit: { width: 80, marginRight: 6 },
-  removeBtnSmall: { backgroundColor: THEME.danger, padding: 8, borderRadius: 16 },
+  colQty: {
+    width: 80,
+    marginRight: 6,
+  },
+  removeBtnSmall: {
+    backgroundColor: THEME.danger,
+    padding: 8,
+    borderRadius: 16,
+  },
 
-  // Suggestion dropdown
-  suggestBox: {
-  position: 'absolute', left: 0, right: 0, top: 44,
-  backgroundColor: '#fff',
-  borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB',
-  shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 8,       // ✅ Android
-  zIndex: 1600,      // ✅ iOS/Android ใหม่
-  maxHeight: 240,
-},
-  colNameWrap: { flex: 1.1, marginRight: 6, position: 'relative', zIndex: 9999 },
-  suggestLoading: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 12,
-  },
-  suggestItem: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-  },
-  suggestText: { flex: 1, color: '#111' },
-  suggestMeta: { color: '#64748B', marginLeft: 8, fontSize: 12 },
-  suggestEmpty: { paddingVertical: 10, paddingHorizontal: 12 },
-  
-  actionRow: { flexDirection: 'row', marginTop: 18, justifyContent: 'center' },
-  btn: {
-    minWidth: 120, paddingVertical: 12, paddingHorizontal: 18,
-    borderRadius: 22, alignItems: 'center', marginHorizontal: 6
-  },
-  btnText: { color: '#fff', fontWeight: '700' },
-
-  center: { alignItems: 'center', justifyContent: 'center' },
-  // ใน styles.suggestBox แทนที่ด้วย
+  // Suggestion box
   suggestBox: {
     position: 'absolute',
-    left: 0, right: 0, top: 44,
-    backgroundColor: '#fff',
+    left: 0,
+    right: 0,
+    top: 48,
+    backgroundColor: '#FFF',
     borderRadius: 12,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: THEME.yellow,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 8,     // ⬅️ สำคัญบน Android
-    zIndex: 9999,     // ⬅️ สำคัญบน iOS/Android ใหม่
+    elevation: 8,
+    zIndex: 9999,
     maxHeight: 240,
   },
-  // และใน styles.colNameWrap ให้มี zIndex สูงไว้ด้วย
-  colNameWrap: {
-    flex: 1.1, marginRight: 6, position: 'relative', zIndex: 9999,
+  suggestLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
-  // กล่องรอบ ๆ ช่องหน่วย
-unitWrap: {
-  width: 96,
-  marginRight: 6,
-  position: 'relative',
-  zIndex: 1700,         // ให้ลอยเหนือคอมโพเนนต์อื่น
-},
-unitBox: {
-  backgroundColor: '#f6efc7',
-  borderRadius: 22,
-  paddingHorizontal: 12,
-  paddingVertical: Platform.select({ ios: 10, android: 8 }),
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-},
-unitText: { color: '#111', maxWidth: 70 },
-unitDropdown: {
-  position: 'absolute',
-  left: 0, right: 0,
-  top: 44,                // สูงพอให้ลงใต้ปุ่ม
-  backgroundColor: '#fff',
-  borderRadius: 12,
-  borderWidth: 1, borderColor: '#E5E7EB',
-  overflow: 'hidden',
-  shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 8,          // Android
-  zIndex: 9999,
-  maxHeight: 220,
-},
-unitItem: {
-  paddingVertical: 10,
-  paddingHorizontal: 12,
-  borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-},
-unitItemText: { color: '#111' },
-unitEmpty: { paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center' },
-unitEmptyText: { color: '#64748B' },
+  suggestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  suggestText: {
+    flex: 1,
+    color: THEME.text,
+    fontWeight: '500',
+  },
+  suggestEmpty: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
 
+  // Unit dropdown
+  unitWrap: {
+    width: 96,
+    marginRight: 6,
+    position: 'relative',
+    zIndex: 1700,
+  },
+  unitBox: {
+    backgroundColor: THEME.yellowLight,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.select({ ios: 12, android: 10 }),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: THEME.yellow,
+  },
+  unitText: {
+    color: THEME.text,
+    maxWidth: 60,
+    fontWeight: '600',
+  },
+  unitDropdown: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 48,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.yellow,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    zIndex: 9999,
+    maxHeight: 220,
+  },
+  unitItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  unitItemText: {
+    color: THEME.text,
+    fontWeight: '500',
+  },
+  unitEmpty: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  unitEmptyText: {
+    color: '#64748B',
+  },
 
+  // Action buttons
+  actionRow: {
+    flexDirection: 'row',
+    marginTop: 20,
+    justifyContent: 'center',
+    gap: 12,
+  },
+  btn: {
+    minWidth: 120,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  btnSave: {
+    backgroundColor: THEME.bgDark,
+  },
+  btnCancel: {
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: THEME.yellow,
+  },
+  btnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
+ 

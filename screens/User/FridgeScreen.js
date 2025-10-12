@@ -1,5 +1,5 @@
 // screens/User/FridgeScreen.js
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect,useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, Image, ScrollView, Alert
@@ -346,7 +346,7 @@ export default function FridgeScreen() {
       <View style={{ flex: 1 }}>
         <Text style={styles.itemName}>{item.name}</Text>
         <Text style={styles.detailText}>ปริมาณ: {item.quantity}</Text>
-        <Text style={styles.detailText}>ผลิต: {item.production || '-'}</Text>
+        
         <Text style={styles.detailText}>หมดอายุ: {item.expiry || '-'}</Text>
         {groupId && (
           <Text style={styles.addedByText}>{getItemInfo(item)}</Text>
@@ -368,153 +368,338 @@ export default function FridgeScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <SafeAreaView style={styles.safeContainer}>
-      <View style={styles.container}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerLeft}>
-            <Ionicons
-              name={groupId ? "people" : "person"}
-              size={24}
-              color="#6a994e"
-              style={{ marginRight: 8 }}
-            />
-            <View>
-              <Text style={styles.title}>
-                {groupId ? 'ตู้เย็นกลุ่ม' : 'ตู้เย็นของฉัน'}
-              </Text>
-              {groupId && (
-                <Text style={styles.subtitle}>
-                  {currentUserRole === 'host' ?
-                    `ตู้เย็นของคุณ • สมาชิก ${groupMembers.length} คน` :
-                    `ตู้เย็นแชร์ • สมาชิก ${groupMembers.length} คน`
-                  }
-                </Text>
-              )}
-            </View>
-          </View>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('InviteScreen')}
-              style={[styles.iconButton, styles.groupButton]}
-            >
-              <Ionicons name="people" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                navigation.navigate('AddEditIngredient', {});
-              }}
-              style={[styles.iconButton, styles.addButton]}
-            >
-              <Ionicons name="add-circle" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
+  useLayoutEffect(() => {
+  navigation.setOptions({
+    headerTitle: () => (
+      <View style={styles.headerTitleWrap}>
+        <Image source={require('../../assets/logo.png')} style={styles.headerLogo} />
+        <View>
+          <Text style={styles.headerTitleText}>
+            {groupId ? 'ตู้เย็นกลุ่ม' : 'ตู้เย็นของฉัน'}
+          </Text>
+          {groupId && (
+            <Text style={styles.headerSubtitleText}>
+              {currentUserRole === 'host' 
+                ? `ตู้เย็นของคุณ • ${groupMembers.length} คน` 
+                : `ตู้เย็นแชร์ • ${groupMembers.length} คน`}
+            </Text>
+          )}
         </View>
+      </View>
+    ),
+    headerRight: () => (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 12 }}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('InviteScreen')}
+          style={styles.headerIconButton}
+        >
+          <Ionicons name="people" size={22} color="#FFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('AddEditIngredient', {})}
+          style={styles.headerIconButton}
+        >
+          <Ionicons name="add-circle" size={22} color="#FFF" />
+        </TouchableOpacity>
+      </View>
+    ),
+    headerStyle: { backgroundColor: '#425010' },
+    headerTintColor: '#fff',
+    headerShown: true,
+  });
+}, [navigation, groupId, currentUserRole, groupMembers.length]);
 
-        <TextInput
-          placeholder="ค้นหาวัตถุดิบ..."
-          style={styles.searchInput}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
+ return (
+  <SafeAreaView style={styles.safeContainer} edges={['left', 'right']}>
+    <View style={styles.container}>
+      {/* Search */}
+      <TextInput
+        placeholder="ค้นหาวัตถุดิบ..."
+        style={styles.searchInput}
+        value={searchText}
+        onChangeText={setSearchText}
+      />
 
-        <View style={styles.categoryScrollContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {categories.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
+      {/* Category Pills */}
+      <View style={styles.categoryScrollContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {categories.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => setSelectedCategory(cat)}
+              style={[
+                styles.categoryPill,
+                selectedCategory === cat && styles.categoryPillSelected,
+              ]}
+            >
+              <Text
                 style={[
-                  styles.categoryPill,
-                  selectedCategory === cat && styles.categoryPillSelected,
+                  styles.categoryText,
+                  selectedCategory === cat && styles.categoryTextSelected,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.categoryText,
-                    selectedCategory === cat && styles.categoryTextSelected,
-                  ]}
-                >
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <FlatList
-          data={filtered}
-          keyExtractor={(item, idx) => `${item.ownerId}_${item.id}_${idx}`}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="cube-outline" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>
-                {groupId ? 'ไม่มีวัตถุดิบในตู้เย็นกลุ่ม' : 'ไม่พบวัตถุดิบ'}
+                {cat}
               </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => navigation.navigate('AddEditIngredient', {})}
-              >
-                <Text style={styles.emptyButtonText}>เพิ่มวัตถุดิบแรก</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-    </SafeAreaView>
-  );
+
+      {/* FlatList */}
+      <FlatList
+        data={filtered}
+        keyExtractor={(item, idx) => `${item.ownerId}_${item.id}_${idx}`}
+        contentContainerStyle={{ paddingBottom: 30 }}
+        renderItem={renderItem}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cube-outline" size={48} color="#F7F0CE" />
+            <Text style={styles.emptyText}>
+              {groupId ? 'ไม่มีวัตถุดิบในตู้เย็นกลุ่ม' : 'ไม่พบวัตถุดิบ'}
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() => navigation.navigate('AddEditIngredient', {})}
+            >
+              <Text style={styles.emptyButtonText}>เพิ่มวัตถุดิบแรก</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
+    </View>
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({
-  safeContainer: { flex: 1, backgroundColor: '#fefae0' },
-  container: { flex: 1, backgroundColor: '#fefae0', padding: 16 },
+  safeContainer: { 
+    flex: 1, 
+    backgroundColor: '#425010'  // เขียวเข้ม
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFF8E1',  // เขียวกลาง
+    padding: 16 
+  }, 
+  // เพิ่มใน styles
+headerTitleWrap: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+headerLogo: {
+  width: 32,
+  height: 32,
+  marginRight: 8,
+  borderRadius: 6,
+},
+headerTitleText: {
+  color: '#FFF',
+  fontSize: 18,
+  fontWeight: 'bold',
+},
+headerSubtitleText: {
+  color: '#F7F0CE',
+  fontSize: 11,
+  fontWeight: '500',
+  marginTop: 2,
+},
+headerIconButton: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(255,255,255,0.2)',
+},
+  
+
+  // Header (ใช้สไตล์จาก Buy.js)
   headerRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16,
-    backgroundColor: 'white', padding: 16, borderRadius: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF', 
+    padding: 16, 
+    borderRadius: 12,
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 4, 
+    elevation: 3,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#3a3a3a' },
-  subtitle: { fontSize: 12, color: '#6a994e', fontWeight: '500', marginTop: 2 },
-  buttonContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1 
+  },
+  title: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: '#425010'  // เขียวเข้ม
+  },
+  subtitle: { 
+    fontSize: 12, 
+    color: '#769128',  // เขียวกลาง
+    fontWeight: '500', 
+    marginTop: 2 
+  },
+
+  // Buttons (ใช้สไตล์ปุ่มจาก Buy.js)
+  buttonContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8 
+  },
   iconButton: {
-    width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3,
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.15, 
+    shadowRadius: 4, 
+    elevation: 3,
   },
-  groupButton: { backgroundColor: '#6a994e' },
-  addButton: { backgroundColor: '#f4a261' },
+  groupButton: { 
+    backgroundColor: '#769128'  // เขียวกลาง
+  },
+  addButton: { 
+    backgroundColor: '#F7F0CE'  // เหลืองอ่อน
+  },
+
+  // Search
   searchInput: {
-    borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, marginBottom: 16, backgroundColor: '#fff',
-    fontSize: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    borderRadius: 12, 
+    padding: 12, 
+    marginBottom: 16, 
+    backgroundColor: '#FFFFFF',
+    fontSize: 16, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1,
   },
-  categoryScrollContainer: { marginBottom: 16 },
+
+  // Category pills (ใช้สไตล์จาก Buy.js)
+  categoryScrollContainer: { 
+    marginBottom: 16 
+  },
   categoryPill: {
-    backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#ddd', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8, marginRight: 10, justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+    backgroundColor: '#FFFFFF', 
+    borderWidth: 1, 
+    borderColor: '#ddd', 
+    borderRadius: 20,
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    marginRight: 10, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1,
   },
-  categoryPillSelected: { backgroundColor: '#f4a261', borderColor: '#f4a261', shadowOpacity: 0.15 },
-  categoryText: { color: '#555', fontSize: 14, fontWeight: '500' },
-  categoryTextSelected: { color: '#fff', fontWeight: 'bold' },
+  categoryPillSelected: { 
+    backgroundColor: '#F7F0CE',  // เหลืองอ่อน
+    borderColor: '#F7F0CE', 
+    shadowOpacity: 0.15 
+  },
+  categoryText: { 
+    color: '#555', 
+    fontSize: 14, 
+    fontWeight: '500' 
+  },
+  categoryTextSelected: { 
+    color: '#425010',  // เขียวเข้ม
+    fontWeight: 'bold' 
+  },
+
+  // Item cards (ใช้สไตล์การ์ดจาก Buy.js)
   itemRow: {
-    flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: '#fff',
-    padding: 12, borderRadius: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4, elevation: 2,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 12, 
+    backgroundColor: '#FFFFFF',
+    padding: 12, 
+    borderRadius: 12, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.05, 
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4, 
+    elevation: 2,
   },
-  editableItem: { borderLeftWidth: 4, borderLeftColor: '#6a994e' },
-  readOnlyItem: { borderLeftWidth: 4, borderLeftColor: '#ccc', opacity: 0.8 },
+  editableItem: { 
+    borderLeftWidth: 4, 
+    borderLeftColor: '#769128'  // เขียวกลาง
+  },
+  readOnlyItem: { 
+    borderLeftWidth: 4, 
+    borderLeftColor: '#ccc', 
+    opacity: 0.8 
+  },
   itemImage: {
-    width: 60, height: 60, marginRight: 12, borderRadius: 8, resizeMode: 'cover', backgroundColor: '#f0f0f0'
+    width: 60, 
+    height: 60, 
+    marginRight: 12, 
+    borderRadius: 8, 
+    resizeMode: 'cover', 
+    backgroundColor: '#FEF9C3'  // เหลืองอ่อน
   },
-  itemName: { fontWeight: 'bold', fontSize: 16, marginBottom: 4, color: '#333' },
-  detailText: { fontSize: 13, color: '#666', marginBottom: 2 },
-  addedByText: { fontSize: 12, color: '#f4a261', fontWeight: 'bold', marginTop: 4 },
-  actionContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  readOnlyBadge: { padding: 4 },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyText: { textAlign: 'center', color: '#999', fontSize: 16, marginTop: 16, marginBottom: 20 },
-  emptyButton: { backgroundColor: '#6a994e', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-  emptyButtonText: { color: 'white', fontWeight: 'bold' },
+  itemName: { 
+    fontWeight: 'bold', 
+    fontSize: 16, 
+    marginBottom: 4, 
+    color: '#000000ff'  // ดำ
+  },
+  detailText: { 
+    fontSize: 13, 
+    color: '#666', 
+    marginBottom: 2 
+  },
+  addedByText: { 
+    fontSize: 12, 
+    color: '#000000ff',  // ดำ
+    fontWeight: 'bold', 
+    marginTop: 4 
+  },
+  actionContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8 
+  },
+  readOnlyBadge: { 
+    padding: 4 
+  },
+
+  // Empty state
+  emptyContainer: { 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingVertical: 60 
+  },
+  emptyText: { 
+    textAlign: 'center', 
+    color: '#F7F0CE',  // เหลืองอ่อน
+    fontSize: 16, 
+    marginTop: 16, 
+    marginBottom: 20 
+  },
+  emptyButton: { 
+    backgroundColor: '#769128',  // เขียวกลาง
+    paddingHorizontal: 20, 
+    paddingVertical: 10, 
+    borderRadius: 20 
+  },
+  emptyButtonText: { 
+    color: 'white', 
+    fontWeight: 'bold' 
+  },
 });

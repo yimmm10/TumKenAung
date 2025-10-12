@@ -1,5 +1,5 @@
 // screens/User/UserRecipeDetail.js
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
   ActivityIndicator, Modal, TextInput, Alert, Platform
@@ -336,24 +336,29 @@ export default function UserRecipeDetail() {
     );
   }
 
+  useLayoutEffect(() => {
+  navigation.setOptions({
+    headerTitle: () => (
+      <Text style={styles.navHeaderTitle} numberOfLines={1}>
+        {recipe?.title || 'ไม่มีชื่อเมนู'}
+      </Text>
+    ),
+    headerStyle: { backgroundColor: '#425010' },
+    headerTintColor: '#fff',
+    headerTitleAlign: 'left',
+    headerBackTitleVisible: false,
+    headerShown: true,
+  });
+}, [navigation, recipe?.title]);
+
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: THEME.bg }} edges={['top','bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: THEME.bg }} edges={['bottom']}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
         keyboardShouldPersistTaps="always"
       >
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 6 }}>
-            <Ionicons name="chevron-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {recipe.title || 'ไม่มีชื่อเมนู'}
-          </Text>
-          <View style={{ width: 28 }} />
-        </View>
-
         {/* รูปบนสุด */}
         <Image
           source={recipe.imageUrl ? { uri: recipe.imageUrl } : require('../../assets/images/sample-food.jpg')}
@@ -595,30 +600,38 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, paddingTop: 8 },
   headerRow: {
     flexDirection: 'row', alignItems: 'center', marginBottom: 10,
-    backgroundColor: '#fff', borderRadius: 14, padding: 10,
+    backgroundColor: '#425010', borderRadius: 10, padding: 10,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2
   },
-  headerTitle: { fontSize: 18, fontWeight: '800', marginLeft: 10, color: THEME.text, flex: 1 },
+  headerTitle: { fontSize: 18, fontWeight: '800', marginLeft: 10, color: '#ffffffff', flex: 1 },
 
-  heroImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor:'#eee', marginBottom: 10 },
+  heroImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor:'#eee', marginBottom: 10  },
+  
+  navHeaderTitle: {
+  color: '#FFF',
+  fontSize: 18,
+  fontWeight: '800',
+  
+},
+
 
   portionBar: {
-    backgroundColor: THEME.yellow, borderRadius: 12, padding: 12,
+    backgroundColor: '#769128', borderRadius: 12, padding: 12,
     flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 12
   },
-  portionBarLabel: { fontWeight:'800', color:'#111', fontSize:16 },
+  portionBarLabel: { fontWeight:'800', color:'#ffffffff', fontSize:16 },
   portionBarCtrls: { flexDirection:'row', alignItems:'center', gap:8 },
   roundBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', alignItems:'center', justifyContent:'center' },
   roundTxt: { fontWeight:'900', color:'#111' },
   portionNum: { fontWeight:'900', minWidth: 30, textAlign:'center', color: THEME.greenDark, fontSize:16 },
 
   sectionTitle: {
-    backgroundColor: THEME.yellowDeep, color: '#111', fontWeight: '900',
+    backgroundColor: '#769128', color: '#ffffffff', fontWeight: '900',
     paddingHorizontal: 12, paddingVertical: 6, borderTopLeftRadius: 10, borderTopRightRadius: 10,
     marginTop: 10
   },
   sectionTitleAlt: {
-    backgroundColor: THEME.yellowDeep, color: '#111', fontWeight: '900',
+    backgroundColor: '#769128', color: '#ffffffff', fontWeight: '900',
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, marginTop: 10, marginBottom: 8
   },
 

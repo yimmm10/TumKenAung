@@ -697,138 +697,367 @@ export default function AddEditIngredientScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fefae0' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 50, paddingBottom: 20, backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFF8E1'  // เขียวกลาง
   },
-  backButton: { padding: 8 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#333' },
+  
+  // Header แบบ Buy.js
+  header: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingHorizontal: 20, 
+    paddingTop: 50, 
+    paddingBottom: 20, 
+    backgroundColor: '#425010',  // เขียวเข้ม
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 4, 
+    elevation: 3,
+  },
+  backButton: { 
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  title: { 
+    fontSize: 22, 
+    fontWeight: 'bold', 
+    color: '#FFF'  // ขาว
+  },
   placeholder: { width: 40 },
 
-  imageContainer: { margin: 20, borderRadius: 16, overflow: 'hidden', position: 'relative' },
-  image: { width: '100%', height: 200, resizeMode: 'cover', backgroundColor: '#f0f0f0' },
+  // Image container
+  imageContainer: { 
+    margin: 20, 
+    borderRadius: 16, 
+    overflow: 'hidden', 
+    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+  },
+  image: { 
+    width: '100%', 
+    height: 200, 
+    resizeMode: 'cover', 
+    backgroundColor: '#FEF9C3'  // เหลืองอ่อนมาก
+  },
   imageOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute', 
+    bottom: 0, 
+    left: 0, 
+    right: 0,
+    backgroundColor: 'rgba(66, 80, 16, 0.8)',  // เขียวเข้มโปร่งแสง
+    paddingVertical: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center',
   },
-  imageOverlayText: { color: '#fff', fontSize: 14, fontWeight: '600', marginTop: 4 },
+  imageOverlayText: { 
+    color: '#FFF', 
+    fontSize: 14, 
+    fontWeight: '600', 
+    marginTop: 4 
+  },
 
-  form: { paddingHorizontal: 20 },
-  inputGroup: { marginBottom: 20 },
-  label: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 8 },
+  // Icon row (รูประบบ)
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  iconButton: {
+    width: 56, 
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',  // ขาว
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  iconButtonActive: {
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+    backgroundColor: '#FEF9C3',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  iconImage: { 
+    width: 44, 
+    height: 44, 
+    resizeMode: 'contain' 
+  },
+  iconPlaceholder: {
+    width: 44, 
+    height: 44, 
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+
+  // Form
+  form: { 
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF8E1',  // เขียวกลาง
+  },
+  inputGroup: { 
+    marginBottom: 20 
+  },
+  label: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#000000ff',  // ขาว
+    marginBottom: 8 
+  },
   input: {
-    borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 12, padding: 16, backgroundColor: '#fff', fontSize: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+    borderWidth: 1, 
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+    borderRadius: 12, 
+    padding: 16, 
+    backgroundColor: '#FFF', 
+    fontSize: 16,
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1,
   },
 
-  // name suggest
-  nameWrap: { position: 'relative', zIndex: 9999 },
+  // Name suggestion
+  nameWrap: { 
+    position: 'relative', 
+    zIndex: 9999 
+  },
   suggestBox: {
-    position: 'absolute', left: 0, right: 0, top: 54,
-    backgroundColor: '#fff',
+    position: 'absolute', 
+    left: 0, 
+    right: 0, 
+    top: 54,
+    backgroundColor: '#FFF',
     borderRadius: 12,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    borderWidth: 1, 
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 6 },
-    elevation: 8, zIndex: 9999, maxHeight: 220,
+    shadowColor: '#000', 
+    shadowOpacity: 0.08, 
+    shadowRadius: 8, 
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8, 
+    zIndex: 9999, 
+    maxHeight: 220,
   },
   suggestItem: {
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+    paddingVertical: 10, 
+    paddingHorizontal: 12,
+    borderBottomWidth: 1, 
+    borderBottomColor: '#F1F5F9',
   },
-  suggestText: { color: '#111' },
-  suggestLoading: { paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center' },
-  suggestEmpty: { paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center' },
+  suggestText: { 
+    color: '#425010',  // เขียวเข้ม
+    fontWeight: '500'
+  },
+  suggestLoading: { 
+    paddingVertical: 12, 
+    paddingHorizontal: 12, 
+    alignItems: 'center' 
+  },
+  suggestEmpty: { 
+    paddingVertical: 12, 
+    paddingHorizontal: 12, 
+    alignItems: 'center' 
+  },
 
-  quantityRow: { flexDirection: 'row', gap: 12 },
-  quantityInput: { flex: 2 },
+  // Quantity row
+  quantityRow: { 
+    flexDirection: 'row', 
+    gap: 12 
+  },
+  quantityInput: { 
+    flex: 2 
+  },
   unitButton: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 12, padding: 16, backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    borderWidth: 1, 
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+    borderRadius: 12, 
+    padding: 16, 
+    backgroundColor: '#FFF',
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1,
   },
-  unitButtonText: { fontSize: 16, color: '#333', maxWidth: 100 },
+  unitButtonText: { 
+    fontSize: 16, 
+    color: '#425010',  // เขียวเข้ม
+    fontWeight: '600',
+    maxWidth: 100 
+  },
 
+  // Date button
   dateButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 12, padding: 16, backgroundColor: '#fff',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    borderWidth: 1, 
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+    borderRadius: 12, 
+    padding: 16, 
+    backgroundColor: '#FFF',
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1,
   },
-  dateButtonText: { fontSize: 16, color: '#333' },
+  dateButtonText: { 
+    fontSize: 16, 
+    color: '#425010',  // เขียวเข้ม
+    fontWeight: '500'
+  },
 
-  buttonContainer: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingVertical: 20 },
-  cancelButton: { flex: 1, backgroundColor: '#f5f5f5', padding: 16, borderRadius: 12, alignItems: 'center' },
-  cancelButtonText: { fontSize: 16, fontWeight: '600', color: '#666' },
-  saveButton: {
-    flex: 1, backgroundColor: '#6a994e', padding: 16, borderRadius: 12,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+  // Buttons
+  buttonContainer: { 
+    flexDirection: 'row', 
+    gap: 12, 
+    paddingHorizontal: 20, 
+    paddingVertical: 20,
+    backgroundColor: '#FFF8E1',  // เขียวกลาง
   },
-  saveButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  cancelButton: { 
+    flex: 1, 
+    backgroundColor: '#FFF', 
+    padding: 16, 
+    borderRadius: 12, 
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  cancelButtonText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#425010'  // เขียวเข้ม
+  },
+  saveButton: {
+    flex: 1, 
+    backgroundColor: '#425010',  // เขียวเข้ม
+    padding: 16, 
+    borderRadius: 12,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  saveButtonText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#FFF' 
+  },
 
   deleteButton: {
-    backgroundColor: '#d62828', padding: 16, borderRadius: 12,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    marginHorizontal: 20, marginBottom: 30,
+    backgroundColor: '#d62828', 
+    padding: 16, 
+    borderRadius: 12,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginHorizontal: 20, 
+    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  deleteButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  deleteButtonText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#FFF' 
+  },
 
-  modal: { justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', borderRadius: 16, padding: 20, width: '80%', maxHeight: '70%' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 16, color: '#333' },
-  modalItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8, marginBottom: 4,
+  // Modal
+  modal: { 
+    justifyContent: 'center', 
+    alignItems: 'center' 
   },
-  modalItemSelected: { backgroundColor: '#e8f5e8' },
-  modalItemText: { fontSize: 16, color: '#333' },
-  modalItemTextSelected: { color: '#6a994e', fontWeight: '600' },
+  modalContent: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 16, 
+    padding: 20, 
+    width: '80%', 
+    maxHeight: '70%',
+    borderWidth: 2,
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+  },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    textAlign: 'center', 
+    marginBottom: 16, 
+    color: '#425010'  // เขียวเข้ม
+  },
+  modalItem: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingVertical: 12, 
+    paddingHorizontal: 8, 
+    borderRadius: 8, 
+    marginBottom: 4,
+  },
+  modalItemSelected: { 
+    backgroundColor: '#FEF9C3'  // เหลืองอ่อนมาก
+  },
+  modalItemText: { 
+    fontSize: 16, 
+    color: '#425010'  // เขียวเข้ม
+  },
+  modalItemTextSelected: { 
+    color: '#425010',  // เขียวเข้ม
+    fontWeight: '700' 
+  },
 
   quickBtn: {
-    backgroundColor: '#f5f5f5', paddingVertical: 10, paddingHorizontal: 12,
-    borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0',
+    backgroundColor: '#F7F0CE',  // เหลืองอ่อน
+    paddingVertical: 10, 
+    paddingHorizontal: 12,
+    borderRadius: 10, 
+    borderWidth: 1, 
+    borderColor: '#E5E7EB',
   },
-  quickBtnText: { color: '#333', fontWeight: '600' },
+  quickBtnText: { 
+    color: '#425010',  // เขียวเข้ม
+    fontWeight: '600' 
+  },
+  
   builtinItem: {
-   width: '46%',
-   backgroundColor: '#F8FAFC',
-   borderRadius: 12,
-   borderWidth: 1,
-   borderColor: '#E2E8F0',
-   paddingVertical: 14,
-   alignItems: 'center',
-   justifyContent: 'center',
- },
- iconRow: {
-   flexDirection: 'row',
-   alignItems: 'center',
-   justifyContent: 'space-between',
-   paddingHorizontal: 20,
-   marginTop: 6,
-   marginBottom: 10,
- },
- iconButton: {
-   width: 56, height: 56,
-   borderRadius: 28,
-   backgroundColor: '#F3F4F6', // วงกลมเทาอ่อนแบบตัวอย่าง
-   alignItems: 'center',
-   justifyContent: 'center',
-   borderWidth: 1,
-   borderColor: '#E5E7EB',
- },
- iconButtonActive: {
-   borderColor: '#6a994e',
-   shadowColor: '#000',
-   shadowOpacity: 0.12,
-   shadowRadius: 6,
-   shadowOffset: { width: 0, height: 3 },
-   elevation: 3,
- },
- iconImage: { width: 44, height: 44, resizeMode: 'contain' },
- iconPlaceholder: {
-   width: 44, height: 44, borderRadius: 22,
-   backgroundColor: '#ECEFF3',
-   alignItems: 'center', justifyContent: 'center',
- },
+    width: '46%',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#F7F0CE',  // เหลืองอ่อน
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

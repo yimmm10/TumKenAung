@@ -1,5 +1,5 @@
 // HomeScreen.js (Realtime + Pull-to-Refresh + Enhanced Expiry System)
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useLayoutEffect ,useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image,
   TouchableOpacity, StatusBar, Alert, RefreshControl
@@ -167,222 +167,234 @@ export default function HomeScreen() {
     return styles.expDays;
   };
 
-  return (
-    <SafeAreaView style={styles.safeContainer}>
-      <ScrollView
-        style={styles.container}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#556b2f" />
-        }
+  useLayoutEffect(() => {
+  navigation.setOptions({
+    headerTitle: () => (
+      <View style={styles.headerTitleWrap}>
+        <Image source={require('../../assets/logo.png')} style={styles.headerLogo} />
+        <Text style={styles.headerTitleText}>ทำกินเอง</Text>
+      </View>
+    ),
+    headerRight: () => (
+      <TouchableOpacity 
+        onPress={() => {
+          if (allExpiryItems.length === 0) {
+            Alert.alert('การแจ้งเตือน', 'ตอนนี้ยังไม่มีของหมดอายุหรือใกล้หมดอายุ');
+            return;
+          }
+
+          const expiredCount = expiredItems.length;
+          const warningCount = warningItems.length;
+          
+          let message = 'สรุปสถานะวัตถุดิบ:\n\n';
+          
+          if (expiredCount > 0) {
+            message += `หมดอายุแล้ว: ${expiredCount} รายการ\n`;
+            expiredItems.slice(0, 3).forEach(item => {
+              message += `• ${item.name} (${daysLeftText(item)})\n`;
+            });
+            if (expiredCount > 3) message += `และอีก ${expiredCount - 3} รายการ\n`;
+            message += '\n';
+          }
+          
+          if (warningCount > 0) {
+            message += `ใกล้หมดอายุ: ${warningCount} รายการ\n`;
+            warningItems.slice(0, 3).forEach(item => {
+              message += `• ${item.name} (${daysLeftText(item)})\n`;
+            });
+            if (warningCount > 3) message += `และอีก ${warningCount - 3} รายการ\n`;
+          }
+
+          Alert.alert('สรุปวันนี้', message.trim());
+        }} 
+        style={styles.headerBellWrap}
       >
-        <StatusBar backgroundColor="#556b2f" barStyle="light-content" />
+        <View>
+          <Ionicons name="notifications-outline" size={24} color="#FFF" />
+          {notifyCount > 0 && (
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>{Math.min(notifyCount, 99)}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    ),
+    headerStyle: { backgroundColor: '#425010' },
+    headerTintColor: '#fff',
+    headerShown: true,
+  });
+}, [navigation, notifyCount, allExpiryItems, expiredItems, warningItems]);
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} />
-          <Text style={styles.headerText}>ทำกินเอง</Text>
+  return (
+  <SafeAreaView style={styles.safeContainer} edges={['left', 'right']}>
+    <View style={{ flex: 1 }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 30 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#F7F0CE" />
+      }
+    >
+      <StatusBar backgroundColor="#425010" barStyle="light-content" />
 
-          <TouchableOpacity
-            style={styles.bellWrap}
-            onPress={() => {
-              if (allExpiryItems.length === 0) {
-                Alert.alert('การแจ้งเตือน', 'ตอนนี้ยังไม่มีของหมดอายุหรือใกล้หมดอายุ');
-                return;
-              }
+      {/* สูตรอาหารแนะนำ */}
+      <View style={styles.section}>
+        <SectionHeader title="สูตรอาหารแนะนำ" onSeeAll={() => navigation.navigate('SavedRecipes')} />
+        {loadingRecommended ? (
+          <Text style={styles.loadingText}>กำลังโหลด...</Text>
+        ) : recommendedRecipes.length === 0 ? (
+          <Text style={styles.emptyText}>ยังไม่มีสูตรที่วัตถุดิบครบ</Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recipeScroll}>
+            {recommendedRecipes.slice(0, 10).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => navigation.navigate('UserRecipeDetail', { recipe: item })}
+                style={styles.recipeCard}
+              >
+                <Image
+                  source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/sample-food.jpg')}
+                  style={styles.recipeImage}
+                />
+                <Text style={styles.recipeTitle} numberOfLines={2}>{item.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </View>
 
-              const expiredCount = expiredItems.length;
-              const warningCount = warningItems.length;
-              
-              let message = 'สรุปสถานะวัตถุดิบ:\n\n';
-              
-              if (expiredCount > 0) {
-                message += `หมดอายุแล้ว: ${expiredCount} รายการ\n`;
-                expiredItems.slice(0, 3).forEach(item => {
-                  message += `• ${item.name} (${daysLeftText(item)})\n`;
-                });
-                if (expiredCount > 3) message += `และอีก ${expiredCount - 3} รายการ\n`;
-                message += '\n';
-              }
-              
-              if (warningCount > 0) {
-                message += `ใกล้หมดอายุ: ${warningCount} รายการ\n`;
-                warningItems.slice(0, 3).forEach(item => {
-                  message += `• ${item.name} (${daysLeftText(item)})\n`;
-                });
-                if (warningCount > 3) message += `และอีก ${warningCount - 3} รายการ\n`;
-              }
-
-              Alert.alert('สรุปวันนี้', message.trim());
-            }}
-          >
-            <Ionicons name="notifications-outline" size={24} color="white" />
-            {notifyCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{Math.min(notifyCount, 99)}</Text>
-              </View>
+      {/* วัตถุดิบหมดอายุแล้ว */}
+      <View style={styles.section}>
+        <SectionHeader 
+          title={`วัตถุดิบหมดอายุแล้ว ${expiredItems.length > 0 ? `(${expiredItems.length})` : ''}`}
+          onSeeAll={() => navigation.navigate('Fridge')} 
+        />
+        {expiredItems.length === 0 ? (
+          <View style={styles.noItemContainer}>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Text style={styles.noItemText}>ยังไม่มีของหมดอายุ</Text>
+          </View>
+        ) : (
+          <View>
+            {expiredItems.slice(0, 3).map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  getCardStyleByStatus(item),
+                  index === 0 && { marginTop: 5 }
+                ]}
+                onPress={() => navigation.navigate('Fridge')}
+              >
+                <Image
+                  source={item.image ? { uri: item.image } : require('../../assets/images/sample-food.jpg')}
+                  style={styles.expImg}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.expTitle} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.expMeta}>
+                    ปริมาณ: {item.quantity || '-'} · หมดอายุ: {formatDate(item.expiry)}
+                  </Text>
+                </View>
+                <Text style={getDaysTextStyleByStatus(item)}>{daysLeftText(item)}</Text>
+              </TouchableOpacity>
+            ))}
+            {expiredItems.length > 3 && (
+              <TouchableOpacity 
+                style={styles.seeMoreButton}
+                onPress={() => navigation.navigate('Fridge')}
+              >
+                <Text style={styles.seeMoreText}>ดูทั้งหมด {expiredItems.length} รายการ</Text>
+                <Ionicons name="chevron-forward" size={16} color="#000000ff" />
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-        </View>
-
-        {/* สูตรอาหารแนะนำ (Realtime) */}
-        <View style={{ marginTop: 20 }}>
-          <SectionHeader title="สูตรอาหารแนะนำ" onSeeAll={() => navigation.navigate('SavedRecipes')} />
-          {loadingRecommended ? (
-            <Text style={styles.loadingText}>กำลังโหลด...</Text>
-          ) : recommendedRecipes.length === 0 ? (
-            <Text style={styles.emptyText}>ยังไม่มีสูตรที่วัตถุดิบครบ</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recipeScroll}>
-              {recommendedRecipes.slice(0, 10).map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => navigation.navigate('UserRecipeDetail', { recipe: item })}
-                  style={styles.recipeCard}
-                >
-                  <Image
-                    source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/sample-food.jpg')}
-                    style={styles.recipeImage}
-                  />
-                  <Text style={styles.recipeTitle} numberOfLines={2}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* หมดอายุแล้ว */}
-        <View style={{ marginTop: 25 }}>
-          <SectionHeader 
-            title={`วัตถุดิบหมดอายุแล้ว ${expiredItems.length > 0 ? `(${expiredItems.length})` : ''}`}
-            onSeeAll={() => navigation.navigate('Fridge')} 
-          />
-          {expiredItems.length === 0 ? (
-            <View style={styles.noItemContainer}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.noItemText}>ยังไม่มีของหมดอายุ</Text>
-            </View>
-          ) : (
-            <View>
-              {expiredItems.slice(0, 3).map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    getCardStyleByStatus(item),
-                    index === 0 && { marginTop: 5 }
-                  ]}
-                  onPress={() => navigation.navigate('Fridge')}
-                >
-                  <Image
-                    source={item.image ? { uri: item.image } : require('../../assets/images/sample-food.jpg')}
-                    style={styles.expImg}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.expTitle} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.expMeta}>
-                      ปริมาณ: {item.quantity || '-'} · หมดอายุ: {formatDate(item.expiry)}
-                    </Text>
-                  </View>
-                  <Text style={getDaysTextStyleByStatus(item)}>{daysLeftText(item)}</Text>
-                </TouchableOpacity>
-              ))}
-              {expiredItems.length > 3 && (
-                <TouchableOpacity 
-                  style={styles.seeMoreButton}
-                  onPress={() => navigation.navigate('Fridge')}
-                >
-                  <Text style={styles.seeMoreText}>ดูทั้งหมด {expiredItems.length} รายการ</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#8a6d3b" />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* ใกล้หมดอายุ */}
-        <View style={{ marginTop: 25 }}>
-          <SectionHeader 
-            title={`วัตถุดิบใกล้หมดอายุ ${warningItems.length > 0 ? `(${warningItems.length})` : ''}`}
-            onSeeAll={() => navigation.navigate('Fridge')} 
-          />
-          {warningItems.length === 0 ? (
-            <View style={styles.noItemContainer}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              <Text style={styles.noItemText}>ยังไม่มีของใกล้หมดอายุ</Text>
-            </View>
-          ) : (
-            <View>
-              {warningItems.slice(0, 3).map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    getCardStyleByStatus(item),
-                    index === 0 && { marginTop: 5 }
-                  ]}
-                  onPress={() => navigation.navigate('Fridge')}
-                >
-                  <Image
-                    source={item.image ? { uri: item.image } : require('../../assets/images/sample-food.jpg')}
-                    style={styles.expImg}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.expTitle} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.expMeta}>
-                      ปริมาณ: {item.quantity || '-'} · หมดอายุ: {formatDate(item.expiry)}
-                    </Text>
-                  </View>
-                  <Text style={getDaysTextStyleByStatus(item)}>{daysLeftText(item)}</Text>
-                </TouchableOpacity>
-              ))}
-              {warningItems.length > 3 && (
-                <TouchableOpacity 
-                  style={styles.seeMoreButton}
-                  onPress={() => navigation.navigate('Fridge')}
-                >
-                  <Text style={styles.seeMoreText}>ดูทั้งหมด {warningItems.length} รายการ</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#8a6d3b" />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* เมนูลัด */}
-        <View style={{ marginTop: 30 }}>
-          <Text style={styles.sectionTitle}>เมนูลัด</Text>
-          <View style={styles.quickRow}>
-            <QuickAction
-              icon="add-circle-outline"
-              label="เพิ่มวัตถุดิบ"
-              color="#4CAF50"
-              onPress={() => navigation.navigate('AddEditIngredient')}
-            />
-            <QuickAction
-              icon="book-outline"
-              label="เพิ่มสูตรอาหาร"
-              color="#FF9800"
-              onPress={() => navigation.navigate('AddEditRecipe')}
-            />
           </View>
-          <View style={styles.quickRow}>
-            <QuickAction
-              icon="heart-outline"
-              label="สูตรที่บันทึกไว้"
-              color="#E91E63"
-              onPress={() => navigation.navigate('SavedRecipes')}
-            />
-            <QuickAction
-              icon="reader-outline"
-              label="เมนูเคยทำ"
-              color="#9C27B0"
-              onPress={() => navigation.navigate('HistoryRecipes')}
-            />
-          </View>
-        </View>
+        )}
+      </View>
 
-        <View style={{ height: 30 }} />
-      </ScrollView>
-    </SafeAreaView>
-  );
+      {/* วัตถุดิบใกล้หมดอายุ */}
+      <View style={styles.section}>
+        <SectionHeader 
+          title={`วัตถุดิบใกล้หมดอายุ ${warningItems.length > 0 ? `(${warningItems.length})` : ''}`}
+          onSeeAll={() => navigation.navigate('Fridge')} 
+        />
+        {warningItems.length === 0 ? (
+          <View style={styles.noItemContainer}>
+            <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+            <Text style={styles.noItemText}>ยังไม่มีของใกล้หมดอายุ</Text>
+          </View>
+        ) : (
+          <View>
+            {warningItems.slice(0, 3).map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  getCardStyleByStatus(item),
+                  index === 0 && { marginTop: 5 }
+                ]}
+                onPress={() => navigation.navigate('Fridge')}
+              >
+                <Image
+                  source={item.image ? { uri: item.image } : require('../../assets/images/sample-food.jpg')}
+                  style={styles.expImg}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.expTitle} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.expMeta}>
+                    ปริมาณ: {item.quantity || '-'} · หมดอายุ: {formatDate(item.expiry)}
+                  </Text>
+                </View>
+                <Text style={getDaysTextStyleByStatus(item)}>{daysLeftText(item)}</Text>
+              </TouchableOpacity>
+            ))}
+            {warningItems.length > 3 && (
+              <TouchableOpacity 
+                style={styles.seeMoreButton}
+                onPress={() => navigation.navigate('Fridge')}
+              >
+                <Text style={styles.seeMoreText}>ดูทั้งหมด {warningItems.length} รายการ</Text>
+                <Ionicons name="chevron-forward" size={16} color="#F7F0CE" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* เมนูลัด */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>เมนูลัด</Text>
+        <View style={styles.quickRow}>
+          <QuickAction
+            icon="add-circle-outline"
+            label="เพิ่มวัตถุดิบ"
+            color="#4CAF50"
+            onPress={() => navigation.navigate('AddEditIngredient')}
+          />
+          <QuickAction
+            icon="book-outline"
+            label="เพิ่มสูตรอาหาร"
+            color="#FF9800"
+            onPress={() => navigation.navigate('AddEditRecipe')}
+          />
+        </View>
+        <View style={styles.quickRow}>
+          <QuickAction
+            icon="heart-outline"
+            label="สูตรที่บันทึกไว้"
+            color="#E91E63"
+            onPress={() => navigation.navigate('SavedRecipes')}
+          />
+          <QuickAction
+            icon="reader-outline"
+            label="เมนูเคยทำ"
+            color="#9C27B0"
+            onPress={() => navigation.navigate('HistoryRecipes')}
+          />
+        </View>
+      </View>
+    </ScrollView>
+    </View>
+  </SafeAreaView>
+);
 }
 
 /* ---------- Components ---------- */
@@ -645,19 +657,56 @@ async function checkAndNotifyExpiringOncePerDay(uid, items) {
 const styles = StyleSheet.create({
   safeContainer: { 
     flex: 1, 
-    backgroundColor: '#fefae0' 
+    backgroundColor: '#425010'  // เขียวเข้มจาก Buy.js
   },
   container: { 
     flex: 1, 
-    backgroundColor: '#fefae0', 
+    backgroundColor: '#FFF8E1',  // เขียวกลางจาก Buy.js
     paddingHorizontal: 16 
   },
+  // เพิ่มใน styles
+headerTitleWrap: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+headerLogo: {
+  width: 32,
+  height: 32,
+  marginRight: 8,
+  borderRadius: 6,
+},
+headerTitleText: {
+  color: '#FFF',
+  fontSize: 18,
+  fontWeight: 'bold',
+},
+headerBellWrap: {
+  paddingRight: 12,
+  position: 'relative',
+},
+headerBadge: {
+  position: 'absolute',
+  top: -6,
+  right: 6,
+  backgroundColor: '#F7F0CE',
+  minWidth: 18,
+  height: 18,
+  borderRadius: 9,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 3,
+},
+headerBadgeText: {
+  color: '#425010',
+  fontSize: 11,
+  fontWeight: '700',
+},
 
   // Header
   header: {
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#556b2f',
+    backgroundColor: '#425010',  // เขียวเข้ม
     padding: 18, 
     justifyContent: 'space-between', 
     borderRadius: 15, 
@@ -692,13 +741,13 @@ const styles = StyleSheet.create({
     minWidth: 20, 
     height: 20, 
     borderRadius: 10, 
-    backgroundColor: '#FF5722', 
+    backgroundColor: '#F7F0CE',  // เหลืองอ่อนจาก Buy.js
     alignItems: 'center', 
     justifyContent: 'center', 
     paddingHorizontal: 5 
   },
   badgeText: { 
-    color: '#fff', 
+    color: '#425010',  // ตัวอักษรเขียวเข้ม
     fontSize: 12, 
     fontWeight: '700' 
   },
@@ -708,23 +757,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: 15 
+    marginBottom: 15,
+    marginTop: 20
   },
   sectionTitle: { 
     fontWeight: 'bold', 
     fontSize: 20, 
-    color: '#d35400' 
+    color: '#000000ff'  // ขาวเพื่อคอนทราสต์บนพื้นเขียว
   },
   seeAllButton: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: 'rgba(138, 109, 59, 0.1)', 
+    backgroundColor: 'rgba(255, 255, 255, 0.2)', 
     paddingHorizontal: 12, 
     paddingVertical: 6, 
     borderRadius: 20 
   },
   seeAll: { 
-    color: '#8a6d3b', 
+    color: '#b6afafff',  // เหลืองอ่อน
     fontWeight: '600', 
     marginRight: 4 
   },
@@ -734,16 +784,16 @@ const styles = StyleSheet.create({
     textAlign: 'center', 
     marginTop: 15, 
     fontSize: 16, 
-    color: '#78716C' 
+    color: '#FFF' 
   },
   emptyText: { 
     textAlign: 'center', 
     marginTop: 15, 
-    color: '#999', 
+    color: '#F7F0CE', 
     fontSize: 16 
   },
 
-  // Recipe cards
+  // Recipe cards (ใช้สไตล์การ์ดจาก Buy.js)
   recipeScroll: { 
     paddingVertical: 10 
   },
@@ -751,7 +801,7 @@ const styles = StyleSheet.create({
     marginRight: 15, 
     width: 170, 
     alignItems: 'center', 
-    backgroundColor: '#fff', 
+    backgroundColor: '#FFFFFF', 
     borderRadius: 15, 
     padding: 12,
     shadowColor: '#000', 
@@ -765,12 +815,13 @@ const styles = StyleSheet.create({
     height: 110, 
     borderRadius: 12, 
     resizeMode: 'cover', 
-    marginBottom: 8 
+    marginBottom: 8,
+    backgroundColor: '#FEF9C3'  // เหลืองอ่อนจาก Buy.js
   },
   recipeTitle: { 
     fontWeight: 'bold', 
     fontSize: 15, 
-    color: '#333', 
+    color: '#425010',  // เขียวเข้ม
     textAlign: 'center', 
     lineHeight: 20 
   },
@@ -779,25 +830,29 @@ const styles = StyleSheet.create({
   noItemContainer: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#f0f9ff', 
+    backgroundColor: '#FFFFFF', 
     padding: 16, 
     borderRadius: 12, 
     borderLeftWidth: 4, 
-    borderLeftColor: '#4CAF50', 
-    marginTop: 5 
+    borderLeftColor: '#FFF8E1',  // เขียวกลาง
+    marginTop: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   noItemText: { 
-    color: '#0f766e', 
+    color: '#425010', 
     marginLeft: 10, 
     fontSize: 16, 
     fontWeight: '500' 
   },
 
-  // Expired/Warning items
+  // Expired/Warning items (ใช้สไตล์จาก Buy.js)
   expItem: {
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#fff', 
+    backgroundColor: '#FFFFFF', 
     padding: 15, 
     borderRadius: 15,
     shadowColor: '#000', 
@@ -826,12 +881,12 @@ const styles = StyleSheet.create({
     width: 60, 
     height: 60, 
     borderRadius: 12, 
-    backgroundColor: '#eee' 
+    backgroundColor: '#FEF9C3'  // เหลืองอ่อน
   },
   expTitle: { 
     fontSize: 17, 
     fontWeight: '700', 
-    color: '#333', 
+    color: '#425010',  // เขียวเข้ม
     marginBottom: 2 
   },
   expMeta: { 
@@ -841,7 +896,7 @@ const styles = StyleSheet.create({
     lineHeight: 18 
   },
   expDays: { 
-    color: '#556b2f', 
+    color: '#f7f315ff',  // เขียวกลาง
     fontWeight: '700', 
     fontSize: 14 
   },
@@ -851,22 +906,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(138, 109, 59, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(138, 109, 59, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   seeMoreText: {
-    color: '#8a6d3b',
+    color: '#000000ff',  // เหลืองอ่อน
     fontSize: 14,
     fontWeight: '600',
     marginRight: 4,
   },
 
-  // Quick actions
+  // Quick actions (ใช้สไตล์การ์ดจาก Buy.js)
   quickRow: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -875,7 +930,7 @@ const styles = StyleSheet.create({
   },
   quick: { 
     flex: 1, 
-    backgroundColor: '#fff', 
+    backgroundColor: '#FFFFFF', 
     borderRadius: 15, 
     paddingVertical: 20, 
     paddingHorizontal: 12, 
@@ -897,10 +952,14 @@ const styles = StyleSheet.create({
   },
   quickText: { 
     marginTop: 6, 
-    color: '#333', 
+    color: '#425010',  // เขียวเข้ม
     fontWeight: '600', 
     fontSize: 13, 
     textAlign: 'center', 
     lineHeight: 16 
   },
+  section: {
+  marginTop: 20,
+  paddingHorizontal: 16,
+},
 });

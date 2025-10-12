@@ -507,226 +507,432 @@ export default function ProfileScreen() {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.safeContainer}>
-      <View style={styles.screen}>
-        <View style={styles.topSection}>
-          <View style={styles.topHeader}>
-            <View style={styles.topHeaderLeft}>
-              <View style={styles.avatarWrap}>
-                {photoURL ? (
-                  <Image source={{ uri: photoURL }} style={styles.headerAvatar} />
-                ) : (
-                  <View style={[styles.headerAvatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person-circle-outline" size={48} color="#9CA3AF" />
-                  </View>
-                )}
-                <TouchableOpacity
-                  onPress={pickImageAndUpload}
-                  style={styles.cameraBadge}
-                  activeOpacity={0.8}
-                >
-                  {uploadingAvatar
-                    ? <ActivityIndicator size="small" color="#111827" />
-                    : <Ionicons name="camera-outline" size={16} color="#111827" />
-                  }
-                </TouchableOpacity>
+return (
+  <SafeAreaView style={styles.safeContainer} edges={['top']}>
+    <View style={styles.screen}>
+      {/* Top Section */}
+<View style={styles.topSection}>
+  {/* กรอบนอก - สีเขียวเข้ม */}
+  <View style={styles.profileOuterCard}>
+    {/* กรอบใน - สีขาว */}
+    <View style={styles.profileInnerCard}>
+      <View style={styles.topHeader}>
+        <View style={styles.topHeaderLeft}>
+          <View style={styles.avatarWrap}>
+            {photoURL ? (
+              <Image source={{ uri: photoURL }} style={styles.headerAvatar} />
+            ) : (
+              <View style={[styles.headerAvatar, styles.avatarPlaceholder]}>
+                <Ionicons name="person-circle-outline" size={48} color="#999" />
               </View>
-
-              <View>
-                <Text style={styles.headerTitle}>โปรไฟล์</Text>
-                <Text style={styles.headerSubtitle} numberOfLines={1}>{displayName || 'ผู้ใช้'}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity onPress={handleLogout} style={styles.iconBtn} activeOpacity={0.85}>
-              <Ionicons name="log-out-outline" size={20} color="#111827" />
+            )}
+            <TouchableOpacity
+              onPress={pickImageAndUpload}
+              style={styles.cameraBadge}
+              activeOpacity={0.8}
+            >
+              {uploadingAvatar
+                ? <ActivityIndicator size="small" color="#425010" />
+                : <Ionicons name="camera-outline" size={16} color="#425010" />
+              }
             </TouchableOpacity>
           </View>
 
-          <View style={styles.profileCard}>
-            <Ionicons name="create-outline" size={18} style={{ opacity: 0.7 }} />
-            <TextInput
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="เปลี่ยนชื่อแสดงผล"
-              style={styles.nameInput}
-              maxLength={32}
-            />
-            <TouchableOpacity onPress={saveDisplayName} style={styles.saveBtn} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>บันทึก</Text>}
+          <View>
+            <Text style={styles.headerTitle}>โปรไฟล์</Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {displayName || 'ผู้ใช้'}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity onPress={handleLogout} style={styles.iconBtn} activeOpacity={0.85}>
+          <Ionicons name="log-out-outline" size={20} color="#425010" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Profile Edit Card */}
+      <View style={styles.profileCard}>
+        <Ionicons name="create-outline" size={18} color="#425010" style={{ opacity: 0.7 }} />
+        <TextInput
+          value={editName}
+          onChangeText={setEditName}
+          placeholder="เปลี่ยนชื่อแสดงผล"
+          placeholderTextColor="#999"
+          style={styles.nameInput}
+          maxLength={32}
+        />
+        <TouchableOpacity onPress={saveDisplayName} style={styles.saveBtn} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.saveBtnText}>บันทึก</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Order History Button */}
+      <TouchableOpacity
+        style={styles.orderBtn}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('OrderHistoryScreen')}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+          <View style={styles.orderIconWrap}>
+            <Ionicons name="receipt-outline" size={18} color="#425010" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderTitle}>ประวัติการสั่งซื้อ</Text>
+            <Text style={styles.orderSubtitle} numberOfLines={1}>
+              ดูคำสั่งซื้อที่ผ่านมาและสถานะล่าสุด
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#425010" />
             </TouchableOpacity>
           </View>
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+
+      {/* Bottom Section */}
+      <ScrollView style={styles.bottomSection} contentContainerStyle={styles.bottomContent}>
+        {/* Tabs */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'MyRecipes' && styles.activeTab]}
+            onPress={() => setActiveTab('MyRecipes')}
+          >
+            <Ionicons name="document-text-outline" size={16} color="#425010" style={styles.tabIcon} />
+            <Text style={[styles.tabText, activeTab === 'MyRecipes' && styles.activeTabText]}>
+              สูตรของฉัน ({myRecipes.length})
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.orderBtn}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('OrderHistoryScreen')}
+            style={[styles.tab, activeTab === 'SavedRecipes' && styles.activeTab]}
+            onPress={() => setActiveTab('SavedRecipes')}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-              <View style={styles.orderIconWrap}>
-                <Ionicons name="receipt-outline" size={18} color="#111827" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.orderTitle}>ประวัติการสั่งซื้อ</Text>
-                <Text style={styles.orderSubtitle} numberOfLines={1}>
-                  ดูคำสั่งซื้อที่ผ่านมาและสถานะล่าสุด
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#111827" />
+            <Ionicons name="bookmark-outline" size={16} color="#425010" style={styles.tabIcon} />
+            <Text style={[styles.tabText, activeTab === 'SavedRecipes' && styles.activeTabText]}>
+              สูตรที่บันทึกไว้ ({favCount})
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.divider} />
-
-        <ScrollView style={styles.bottomSection} contentContainerStyle={styles.bottomContent}>
-          <View style={styles.tabRow}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'MyRecipes' && styles.activeTab]}
-              onPress={() => setActiveTab('MyRecipes')}
-            >
-              <Ionicons name="document-text-outline" size={16} style={styles.tabIcon} />
-              <Text style={[styles.tabText, activeTab === 'MyRecipes' && styles.activeTabText]}>
-                สูตรของฉัน ({myRecipes.length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'SavedRecipes' && styles.activeTab]}
-              onPress={() => setActiveTab('SavedRecipes')}
-            >
-              <Ionicons name="bookmark-outline" size={16} style={styles.tabIcon} />
-              <Text style={[styles.tabText, activeTab === 'SavedRecipes' && styles.activeTabText]}>
-                สูตรที่บันทึกไว้ ({favCount})
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ marginTop: 10 }}>
-            {renderTabContent()}
-          </View>
-        </ScrollView>
-      </View>
-    </SafeAreaView>
-  );
+        {/* Tab Content */}
+        <View style={{ marginTop: 10 }}>
+          {renderTabContent()}
+        </View>
+      </ScrollView>
+    </View>
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#fefae0',
+    backgroundColor: '#425010',
   },
   screen: {
     flex: 1,
-    backgroundColor: '#fefae0',
+    backgroundColor: '#769128',
   },
+
+  // Top section
   topSection: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 10,
-    backgroundColor: '#d8dd8cff',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    backgroundColor: '#425010',
   },
-  topHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 10,
+  
+  // กรอบนอก - สีเขียวเข้ม
+  profileOuterCard: {
+    backgroundColor: '#556b2f',
+    borderRadius: 16,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  topHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarWrap: { position: 'relative' },
-  headerAvatar: { width: 64, height: 64, borderRadius: 999, backgroundColor: '#eef2f7' },
-  avatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  cameraBadge: {
-    position: 'absolute',
-    right: -2, bottom: -2,
-    backgroundColor: '#FFD54A',
-    borderRadius: 999,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: '#FDF1B6',
-  },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  headerSubtitle: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2,
-  },
-  profileCard: {
-    flexDirection: 'row', alignItems: 'center',
+  
+  // กรอบใน - สีขาว
+  profileInnerCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10,
-    gap: 8, marginTop: 6,
+    padding: 16,
+  },
+
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  topHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarWrap: {
+    position: 'relative',
+  },
+  headerAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 999,
+    backgroundColor: '#FEF9C3',
+    borderWidth: 3,
+    borderColor: '#F7F0CE',
+  },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    backgroundColor: '#F7F0CE',
+    borderRadius: 999,
+    padding: 6,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#425010',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F0CE',
     elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
-  nameInput: { flex: 1, fontSize: 14, paddingVertical: 6 },
+
+  // Profile edit card
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  nameInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 6,
+    color: '#425010',
+  },
   saveBtn: {
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
-    backgroundColor: '#111827',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#769128',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  saveBtnText: { color: '#fff', fontWeight: '700' },
+  saveBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
+  // Order button
   orderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FA',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  orderIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F0CE',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  orderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#425010',
+  },
+  orderSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#FFF8E1',
+  },
+  bottomContent: {
+    padding: 18,
+    paddingBottom: 30,
+  },
+
+  // Tabs
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingVertical: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  tabIcon: {
+    opacity: 0.9,
+  },
+  activeTab: {
+    backgroundColor: '#F7F0CE',
+    borderColor: '#F7F0CE',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#425010',
+  },
+  activeTabText: {
+    color: '#425010',
+  },
+
+center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 6,
+  },
+  dimText: {
+    color: '#F7F0CE',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  addRecipeButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  addRecipeButtonText: {
+    color: '#425010',
+    fontWeight: 'bold',
+  },
+
+  // Recipe cards
+  recipeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  orderIconWrap: {
-    width: 28, height: 28, borderRadius: 999,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFD54A',
-    borderWidth: 1, borderColor: '#FDF1B6',
+  recipeImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 10,
+    backgroundColor: '#FEF9C3',
   },
-  orderTitle: { fontSize: 15, fontWeight: '800', color: '#111827' },
-  orderSubtitle: { fontSize: 12, color: '#6B7280' },
-  divider: { height: 1, backgroundColor: '#E5E7EB' },
-  bottomSection: { flex: 1 },
-  bottomContent: { padding: 18, paddingBottom: 28 },
-  tabRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  tab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#E5E7EB', borderRadius: 999, paddingVertical: 10, gap: 6,
+  recipeTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#425010',
   },
-  tabIcon: { opacity: 0.9 },
-  activeTab: { backgroundColor: '#FFD54A' },
-  tabText: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  activeTabText: { color: '#111827' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  centerBox: { alignItems: 'center', justifyContent: 'center', paddingVertical: 20, gap: 6 },
-  dimText: { color: '#6B7280', marginTop: 4, textAlign: 'center' },
-  addRecipeButton: {
-    backgroundColor: '#6a994e',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginTop: 10,
+  recipeMeta: {
+    marginTop: 2,
+    color: '#666',
+    fontSize: 12,
   },
-  addRecipeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  recipeStatus: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '700',
   },
-  recipeCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#FFFFFF', borderRadius: 12,
-    padding: 12, marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4,
+  statusApprove: {
+    color: '#769128',
   },
-  recipeImage: { width: 76, height: 76, borderRadius: 10, backgroundColor: '#eef2f7' },
-  recipeTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  recipeMeta: { marginTop: 2, color: '#6B7280', fontSize: 12 },
-  recipeStatus: { marginTop: 2, fontSize: 12, fontWeight: '700' },
-  statusApprove: { color: '#2E7D32' },
-  statusReject:  { color: '#C62828' },
+  statusReject: {
+    color: '#C62828',
+  },
 });
