@@ -1,5 +1,5 @@
 // screens/User/ReviewWriteScreen.js
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useLayoutEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   Image, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
@@ -148,7 +148,22 @@ export default function ReviewWriteScreen() {
     }
   }, [canSubmit, me, vendorId, rating, text]);
 
-  const headerTitle = vendorLoading ? 'รีวิวร้าน' : (vendor?.name ? `รีวิวร้าน: ${vendor.name}` : 'รีวิวร้าน');
+  const headerTitleStr = vendorLoading ? 'รีวิวร้าน' : (vendor?.name ? `รีวิวร้าน: ${vendor.name}` : 'รีวิวร้าน');
+
+  // ทำให้แถบบนเป็นสีเขียวเข้ม + ตัวอักษรสีขาว
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: '#425010' },
+      headerTintColor: '#fff',
+      headerShadowVisible: false,
+      headerBackTitleVisible: false,
+      headerTitle: () => (
+        <Text style={styles.navTitle} numberOfLines={1} ellipsizeMode="tail">
+          {headerTitleStr}
+        </Text>
+      ),
+    });
+  }, [navigation, headerTitleStr]);
 
   return (
     <KeyboardAvoidingView
@@ -158,14 +173,7 @@ export default function ReviewWriteScreen() {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={22} color="#111" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-            <View style={{ width: 22 }} />
-          </View>
+          
 
           <ScrollView
             contentContainerStyle={{ padding: 16, paddingBottom: 180 }}
@@ -267,9 +275,11 @@ function StarInput({ value = 0, onChange }) {
 
 /* ===== styles ===== */
 const styles = StyleSheet.create({
-  header:{ height:95, borderBottomWidth:1, borderBottomColor:'#eee', paddingHorizontal:12, flexDirection:'row', alignItems:'center' },
-  backBtn:{ width:32, height:32, alignItems:'center', justifyContent:'center', marginRight:8 },
-  headerTitle:{ flex:1, textAlign:'center', fontSize:18, fontWeight:'600', color:'#111' },
+  navTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: Platform.OS === 'android' ? 20 : 17, // ปรับตามชอบ
+  },
 
   formLabel:{ fontSize:13, color:'#555', marginBottom:4 },
   textArea:{ minHeight:90, borderWidth:1, borderColor:'#e5e5e5', borderRadius:12, padding:10, textAlignVertical:'top', fontSize:14, color:'#111', backgroundColor:'#fafafa' },

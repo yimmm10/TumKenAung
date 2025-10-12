@@ -48,23 +48,38 @@ export default function VendorShopScreen() {
 
   // ---------- header ----------
   useLayoutEffect(() => {
-    navigation.setOptions({
-      title: vendor?.name || '',
-      headerTitle: vendor?.name ? vendor.name : 'ร้านค้า',
-      headerRight: () => (
-        <TouchableOpacity onPress={() => navigation.navigate('Cart')} style={{ paddingRight: 12 }}>
-          <View>
-            <Ionicons name="cart-outline" size={22} />
-            {cartCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cartCount > 99 ? '99+' : cartCount}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, vendor?.name, cartCount]);
+  navigation.setOptions({
+
+   headerTitle: () => (
+     <Text
+       style={styles.navTitle}
+       numberOfLines={1}
+       ellipsizeMode="tail"
+     >
+       {vendor?.name || 'ร้านค้า'}
+     </Text>
+   ),
+    headerBackTitleVisible: false,
+    headerStyle: { backgroundColor: '#425010' },
+    headerTintColor: '#fff',
+    headerTitleStyle: { color: '#fff', fontWeight: '700' },
+    headerShadowVisible: false,
+    headerRight: () => (
+      <TouchableOpacity onPress={() => navigation.navigate('Cart')} style={{ paddingRight: 12 }}>
+        <View>
+
+         <Ionicons name="cart-outline" size={22} color="#fff" />
+          {cartCount > 0 && (
+            <View style={styles.badge}>
+
+            <Text style={styles.badgeText}>{cartCount > 99 ? '99+' : String(cartCount)}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    ),
+  });
+}, [navigation, vendor?.name, cartCount]);
 
   // ---------- utils ----------
   const toRad = (v) => (v * Math.PI) / 180;
@@ -297,4 +312,11 @@ const styles = StyleSheet.create({
   image: { width: CARD_W-16, height: CARD_W-16, borderRadius:8, backgroundColor:'#F5F5F5' },
   name: { marginTop:6, fontSize:13, lineHeight:16 },
   price: { marginTop:2, fontWeight:'700' },
+  navTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: Platform.OS === 'android' ? 20 : 17, // อยากใหญ่ขึ้นก็ปรับ 22/24 ได้
+    // ถ้าไม่อยากให้โดนระบบปรับขนาดตาม Accessibility:
+    // includeFontPadding: false, // optional (Android)
+  },
 });

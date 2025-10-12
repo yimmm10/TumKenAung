@@ -52,14 +52,11 @@ export default function ProfileScreen() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       try {
         // ⚠️ ถ้ากำลัง logout อยู่ ไม่ต้องแสดง Alert
-        if (!user) {
-          if (!isLoggingOut.current) {
-            Alert.alert('ยังไม่ได้ล็อกอิน', 'กรุณาเข้าสู่ระบบก่อน');
-          }
-          setUid(null);
-          setLoading(false);
-          return;
-        }
+        if (!user) {        // ออกจากระบบหรือยังไม่ได้ล็อกอิน → เงียบไว้
+       setUid(null);
+       setLoading(false);
+       return;
+     }
         setUid(user.uid);
 
         const uRef = doc(db, USERS_COLLECTION, user.uid);
@@ -361,25 +358,36 @@ export default function ProfileScreen() {
             // ตั้งค่า flag เพื่อป้องกัน Alert ซ้ำจาก onAuthStateChanged
             isLoggingOut.current = true;
             
-            await signOut(auth);
+         // ปิดเสียง Alert ชั่วคราวกัน pop-up จากหน้าที่จะถูกเปิดหลัง logout (เช่น Login)
+         const originalAlert = Alert.alert;
+         let restored = false;
+         const restore = () => {
+           if (!restored) { Alert.alert = originalAlert; restored = true; }
+         };
+         Alert.alert = (...args) => {
+           const title = String(args?.[0] ?? '');
+           // กรองข้อความที่เราไม่อยากให้แสดง (กัน "ไม่พบผู้ใช้งาน", "ยังไม่ได้ล็อกอิน")
+           if (title.includes('ไม่พบผู้ใช้งาน') || title.includes('ยังไม่ได้ล็อกอิน')) return;
+           return originalAlert(...args);
+         };
+            
+         await signOut(auth);
             
             // แสดง Alert สำเร็จเพียงครั้งเดียว
-            Alert.alert('ออกจากระบบสำเร็จ', '', [
-              {
-                text: 'ตกลง',
-                onPress: () => {
-                  isLoggingOut.current = false;
-                  if (navigation?.reset) {
-                    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-                  } else {
-                    navigation?.navigate?.('Login');
-                  }
-                }
-              }
-            ]);
+            // นำทางไปหน้า Login แบบเงียบ
+         if (navigation?.reset) {
+           navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+         } else {
+           navigation?.navigate?.('Login');
+         }
+         // คืน Alert หลังผ่านช่วงเปลี่ยนหน้าสั้นๆ
+        setTimeout(restore, 1200);
           } catch (e) {
             console.error('Logout error:', e);
             isLoggingOut.current = false;
+         // คืน Alert ก่อนแจ้ง error
+         // (กันไว้กรณีเกิด error ก่อนถึง setTimeout)
+         try { Alert.alert = originalAlert; } catch {}
             Alert.alert('เกิดข้อผิดพลาด', e.message || 'ไม่สามารถออกจากระบบได้');
           }
         },
